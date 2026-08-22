@@ -152,6 +152,11 @@ export class LobbyUI {
   }
 
   showLobby(roomCode, players, isHost, mySeat) {
+    // Skip re-render if nothing changed (prevents flickering)
+    const key = `${roomCode}:${players.map(p => `${p.seat}:${p.name}`).join(',')}:${isHost}`;
+    if (this._lastLobbyKey === key) return;
+    this._lastLobbyKey = key;
+
     const seats = [];
     for (let i = 0; i < MAX_PLAYERS; i++) {
       const player = players.find(p => p.seat === i);

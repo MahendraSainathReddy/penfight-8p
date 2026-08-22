@@ -48,6 +48,7 @@ export class NetworkManager {
     this.onDisconnected = null;
 
     this.players = [];
+    this.gameStarted = false;
   }
 
   generateRoomCode() {
@@ -258,6 +259,11 @@ export class NetworkManager {
   _handleHostMessage(conn, msg) {
     switch (msg.type) {
       case 'join': {
+        // Reject if game already started
+        if (this.gameStarted) {
+          this._send(conn, { type: 'game_in_progress' });
+          return;
+        }
         if (this.players.length >= 8) {
           this._send(conn, { type: 'full' });
           return;
@@ -370,6 +376,10 @@ export class NetworkManager {
       case 'full':
         if (this.onError) this.onError('Room is full (8 players max)');
         break;
+
+      case 'game_in_progress':
+        if (this.onError) this.onError('Game already started. Wait for the next match.');
+        break;
     }
   }
 
@@ -422,6 +432,7 @@ export class NetworkManager {
   // Host: start the game
   startGame(state) {
     if (!this.isHost) return;
+    this.gameStarted = true;
     const msg = { type: 'start', state };
     this._broadcast(msg);
     if (this.onGameStart) this.onGameStart(state);

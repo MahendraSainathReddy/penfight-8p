@@ -42,15 +42,15 @@ export function createScene() {
 
 export function createCamera(renderer) {
   const aspect = window.innerWidth / window.innerHeight;
-  const camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 50);
+  const camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 50);
 
-  // On portrait (mobile), use more top-down view to show full desk
   if (aspect < 1) {
-    camera.position.set(0, 1.1, 0.3);
+    // Portrait (mobile): nearly top-down, pull back enough to see full desk
+    camera.position.set(0, 1.0, 0.15);
     camera.lookAt(0, 0, 0);
   } else {
-    // Landscape (desktop)
-    camera.position.set(0, 0.85, 0.45);
+    // Landscape (desktop): angled view
+    camera.position.set(0, 0.75, 0.4);
     camera.lookAt(0, 0, -0.02);
   }
   return camera;
@@ -213,105 +213,77 @@ export function createPenMesh(scene, seatIndex) {
   const R = PEN.radius;
   const HL = PEN.halfLength;
 
-  // === Main barrel — use LatheGeometry for realistic tapered pen shape ===
-  // Profile points (x = radius at that height, y = position along pen)
-  // Pen lies along Z, so we build along Y then rotate
-  const barrelProfile = [
-    new THREE.Vector2(0, 0),                    // very tip point
-    new THREE.Vector2(R * 0.25, 0.003),         // nib taper
-    new THREE.Vector2(R * 0.5, 0.008),          // nib widens
-    new THREE.Vector2(R * 0.75, 0.014),         // transition to barrel
-    new THREE.Vector2(R * 0.95, 0.02),          // barrel start
-    new THREE.Vector2(R * 1.0, 0.04),           // full barrel
-    new THREE.Vector2(R * 1.0, HL * 2 - 0.03), // barrel end
-    new THREE.Vector2(R * 1.05, HL * 2 - 0.025),// cap ridge
-    new THREE.Vector2(R * 1.05, HL * 2 - 0.005),// cap body
-    new THREE.Vector2(R * 0.85, HL * 2),        // cap top (rounded in)
-    new THREE.Vector2(0, HL * 2),               // close top
-  ];
+  // Simple but good-looking pen: cylinder body + cone tip + cap
+  // Everything built lying along Z axis (matching physics)
 
-  const barrelGeo = new THREE.LatheGeometry(barrelProfile, 24);
+  // === Main barrel (cylinder along Z) ===
+  const barrelGeo = new THREE.CylinderGeometry(R, R, HL * 2, 16);
   const barrelMat = new THREE.MeshStandardMaterial({
     color: color.three,
-    roughness: 0.28,
-    metalness: 0.15,
+    roughness: 0.35,
+    metalness: 0.1,
   });
   const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+  barrel.rotation.x = Math.PI / 2; // lie along Z
   barrel.castShadow = true;
   barrel.receiveShadow = true;
-  // Position: lathe is built along Y, tip at origin
-  // Rotate to lie along Z, center at pen center
-  barrel.rotation.x = -Math.PI / 2;
-  barrel.position.z = -HL;
   group.add(barrel);
 
-  // === Chrome nib/tip (metallic cone at the writing end) ===
-  const nibGeo = new THREE.ConeGeometry(R * 0.55, 0.018, 12);
-  const nibMat = new THREE.MeshStandardMaterial({
-    color: 0xc0c0c0,
-    roughness: 0.05,
-    metalness: 0.95,
+  // === Tip section (tapered cone at +Z end) ===
+  const tipLength = 0.02;
+  const tipGeo = new THREE.ConeGeometry(R, tipLength, 16);
+  const tipMat = new THREE.MeshStandardMaterial({
+    color: 0xb0b0b0,
+    roughness: 0.1,
+    metalness: 0.85,
   });
-  const nib = new THREE.Mesh(nibGeo, nibMat);
-  nib.rotation.x = Math.PI / 2;
-  nib.position.z = HL + 0.009;
-  nib.castShadow = true;
-  group.add(nib);
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.rotation.x = -Math.PI / 2; // point along +Z
+  tip.position.z = HL + tipLength / 2;
+  tip.castShadow = true;
+  group.add(tip);
 
-  // === Grip section (rubberized darker band) ===
-  const gripGeo = new THREE.CylinderGeometry(R * 1.03, R * 1.03, 0.028, 16);
-  const gripMat = new THREE.MeshStandardMaterial({
-    color: 0x1a1a1a,
-    roughness: 0.85,
-    metalness: 0.0,
+  // === Cap section (slightly wider cylinder at -Z end) ===
+  const capLength = HL * 0.4;
+  const capGeo = new THREE.CylinderGeometry(R * 1.05, R * 1.05, capLength, 16);
+  const capMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color.three).multiplyScalar(0.7),
+    roughness: 0.3,
+    metalness: 0.15,
   });
-  const grip = new THREE.Mesh(gripGeo, gripMat);
-  grip.rotation.x = Math.PI / 2;
-  grip.position.z = HL * 0.55;
-  group.add(grip);
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.rotation.x = Math.PI / 2;
+  cap.position.z = -HL + capLength / 2 - 0.002;
+  group.add(cap);
 
-  // === Cap band (gold/chrome ring where cap meets body) ===
-  const bandGeo = new THREE.CylinderGeometry(R * 1.08, R * 1.08, 0.004, 16);
+  // === Cap end (flat circle at very back) ===
+  const capEndGeo = new THREE.CircleGeometry(R * 1.05, 16);
+  const capEnd = new THREE.Mesh(capEndGeo, capMat);
+  capEnd.rotation.y = Math.PI;
+  capEnd.position.z = -HL - 0.002;
+  group.add(capEnd);
+
+  // === Gold band (ring between body and cap) ===
+  const bandGeo = new THREE.TorusGeometry(R * 1.02, 0.001, 8, 24);
   const bandMat = new THREE.MeshStandardMaterial({
     color: 0xd4af37,
     roughness: 0.1,
     metalness: 0.9,
   });
   const band = new THREE.Mesh(bandGeo, bandMat);
-  band.rotation.x = Math.PI / 2;
-  band.position.z = -HL * 0.45;
+  band.position.z = -HL + capLength - 0.002;
   group.add(band);
 
-  // === Pocket clip (the spring-metal clip on the cap) ===
-  // Clip body
-  const clipLen = HL * 0.55;
-  const clipGeo = new THREE.BoxGeometry(0.0025, 0.003, clipLen);
+  // === Pocket clip ===
+  const clipGeo = new THREE.BoxGeometry(0.003, 0.002, capLength * 0.8);
   const clipMat = new THREE.MeshStandardMaterial({
-    color: 0xc8c8c8,
-    metalness: 0.9,
+    color: 0xcccccc,
+    metalness: 0.85,
     roughness: 0.15,
   });
   const clip = new THREE.Mesh(clipGeo, clipMat);
-  clip.position.set(0, R + 0.0015, -HL * 0.5);
+  clip.position.set(0, R + 0.001, -HL + capLength * 0.4);
   group.add(clip);
-
-  // Clip ball (small sphere at the end of the clip)
-  const clipBallGeo = new THREE.SphereGeometry(0.003, 8, 6);
-  const clipBall = new THREE.Mesh(clipBallGeo, clipMat);
-  clipBall.position.set(0, R + 0.001, -HL * 0.5 + clipLen / 2 - 0.002);
-  group.add(clipBall);
-
-  // === Cap top button (small circle at the very back) ===
-  const buttonGeo = new THREE.CylinderGeometry(R * 0.4, R * 0.5, 0.004, 10);
-  const buttonMat = new THREE.MeshStandardMaterial({
-    color: color.three,
-    roughness: 0.3,
-    metalness: 0.4,
-  });
-  const button = new THREE.Mesh(buttonGeo, buttonMat);
-  button.rotation.x = Math.PI / 2;
-  button.position.z = -HL - 0.002;
-  group.add(button);
 
   scene.add(group);
   return group;
