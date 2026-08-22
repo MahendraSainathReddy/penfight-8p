@@ -334,7 +334,7 @@ html, body {
 /* Turn indicator */
 .hud-turn {
   position: absolute;
-  bottom: 24px;
+  top: 60px;
   left: 50%;
   transform: translateX(-50%);
   padding: 10px 24px;
@@ -509,7 +509,7 @@ html, body {
   }
 
   .hud-turn {
-    bottom: 16px;
+    top: 50px;
     font-size: 0.8rem;
     padding: 8px 18px;
   }
