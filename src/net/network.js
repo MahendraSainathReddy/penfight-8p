@@ -40,7 +40,6 @@ export class NetworkManager {
     this.onShot = null;
     this.onSettled = null;
     this.onSync = null;
-    this.onPass = null;
     this.onNextRound = null;
     this.onPlayerLeft = null;
     this.onRematchVote = null;
@@ -295,16 +294,8 @@ export class NetworkManager {
   _handleHostMessage(conn, msg) {
     switch (msg.type) {
       case 'join': {
-        // Reject if game already started
-        if (this.gameStarted) {
-          this._send(conn, { type: 'game_in_progress' });
-          return;
-        }
-        if (this.players.length >= 8) {
-          this._send(conn, { type: 'full' });
-          return;
-        }
-        // Check if already in (reconnect or duplicate)
+        // Check if already in (reconnect or duplicate) — MUST be checked before gameStarted
+        // so disconnected players can rejoin active games
         const existing = this.players.find(p => p.peerId === msg.peerId);
         if (existing) {
           existing.connected = true;
@@ -316,13 +307,16 @@ export class NetworkManager {
             roomCode: this.roomCode,
           });
           this._broadcastRoster();
+          // If game is active, send them current state so they resync
+          if (this.gameStarted && this.onSyncRequest) {
+            this.onSyncRequest(existing.seat);
+          }
           return;
         }
 
-        // Also check if same name already exists (prevent duplicates from same browser)
-        const sameName = this.players.find(p => p.name === msg.name && p.connected);
+        // Check if same name exists (reconnect from same browser with new peerId)
+        const sameName = this.players.find(p => p.name === msg.name);
         if (sameName) {
-          // Treat as reconnect — update their peerId
           sameName.peerId = msg.peerId;
           sameName.connected = true;
           this.connections.set(msg.peerId, conn);
@@ -333,6 +327,19 @@ export class NetworkManager {
             roomCode: this.roomCode,
           });
           this._broadcastRoster();
+          if (this.gameStarted && this.onSyncRequest) {
+            this.onSyncRequest(sameName.seat);
+          }
+          return;
+        }
+
+        // New player — reject if game already started or room full
+        if (this.gameStarted) {
+          this._send(conn, { type: 'game_in_progress' });
+          return;
+        }
+        if (this.players.length >= 8) {
+          this._send(conn, { type: 'full' });
           return;
         }
 
@@ -451,10 +458,6 @@ export class NetworkManager {
 
       case 'sync':
         if (this.onSync) this.onSync(msg);
-        break;
-
-      case 'pass':
-        if (this.onPass) this.onPass(msg);
         break;
 
       case 'next_round':

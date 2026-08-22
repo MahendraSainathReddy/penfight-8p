@@ -35,9 +35,7 @@ export function createDesk(world) {
 }
 
 export function createWalls(world) {
-  // No physical walls — pens slide off the desk and are detected as "out"
-  // by the isPenOnDesk check. This matches real pen fight where pens
-  // just go off the edge.
+  // No walls — pens slide off desk and are detected as "out"
 }
 
 export function createPen(world, x, z, yaw) {
@@ -101,12 +99,6 @@ export function setPenState(body, state) {
   body.setRotation({ x: state.q[0], y: state.q[1], z: state.q[2], w: state.q[3] }, true);
   body.setLinvel({ x: state.lv[0], y: state.lv[1], z: state.lv[2] }, true);
   body.setAngvel({ x: state.av[0], y: state.av[1], z: state.av[2] }, true);
-}
-
-export function applyFlick(body, direction, power, maxForce) {
-  const force = power * maxForce;
-  const impulse = { x: direction.x * force, y: 0, z: direction.z * force };
-  body.applyImpulse(impulse, true);
 }
 
 export function isPenOnDesk(body) {

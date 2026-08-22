@@ -300,6 +300,11 @@ class PenFightGame {
     // Handle resize
     window.addEventListener('resize', () => this._onResize());
 
+    // Send leave message when tab is closed
+    window.addEventListener('beforeunload', () => {
+      this.network.destroy();
+    });
+
     // Start game loop
     this.lastTime = performance.now();
     this.accumulator = 0;
@@ -779,9 +784,21 @@ class PenFightGame {
 
   _onResize() {
     if (!this.camera || !this.renderer) return;
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const aspect = window.innerWidth / window.innerHeight;
+    this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // Reposition camera based on new orientation
+    if (aspect < 1) {
+      // Portrait
+      this.camera.position.set(0, 0.5, 0.5);
+      this.camera.lookAt(0, 0, 0.02);
+    } else {
+      // Landscape
+      this.camera.position.set(0, 0.4, 0.35);
+      this.camera.lookAt(0, 0, 0);
+    }
   }
 }
 
