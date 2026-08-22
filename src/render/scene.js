@@ -230,20 +230,6 @@ export function createPenMesh(scene, seatIndex) {
   barrel.receiveShadow = true;
   group.add(barrel);
 
-  // === Tip section (tapered cone at +Z end) ===
-  const tipLength = 0.012;
-  const tipGeo = new THREE.ConeGeometry(R, tipLength, 16);
-  const tipMat = new THREE.MeshStandardMaterial({
-    color: 0xb0b0b0,
-    roughness: 0.1,
-    metalness: 0.85,
-  });
-  const tip = new THREE.Mesh(tipGeo, tipMat);
-  tip.rotation.x = -Math.PI / 2; // point along +Z
-  tip.position.z = HL + tipLength / 2;
-  tip.castShadow = true;
-  group.add(tip);
-
   // === Cap section (slightly wider cylinder at -Z end) ===
   const capLength = HL * 0.4;
   const capGeo = new THREE.CylinderGeometry(R * 1.05, R * 1.05, capLength, 16);
