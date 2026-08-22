@@ -43,9 +43,16 @@ export function createScene() {
 export function createCamera(renderer) {
   const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 50);
-  // Angled top-down view, like looking at a desk
-  camera.position.set(0, 0.85, 0.5);
-  camera.lookAt(0, 0, -0.02);
+
+  // On portrait (mobile), use more top-down view to show full desk
+  if (aspect < 1) {
+    camera.position.set(0, 1.1, 0.3);
+    camera.lookAt(0, 0, 0);
+  } else {
+    // Landscape (desktop)
+    camera.position.set(0, 0.85, 0.45);
+    camera.lookAt(0, 0, -0.02);
+  }
   return camera;
 }
 
@@ -279,19 +286,15 @@ export function syncPenMesh(mesh, body) {
 }
 
 export function createAimLine(scene) {
-  const material = new THREE.LineDashedMaterial({
-    color: 0xff6666,
-    dashSize: 0.008,
-    gapSize: 0.004,
-    linewidth: 2,
+  const material = new THREE.LineBasicMaterial({
+    color: 0xffffff,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.6,
   });
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(6);
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   const line = new THREE.Line(geometry, material);
-  line.computeLineDistances();
   line.visible = false;
   scene.add(line);
   return line;
@@ -304,12 +307,20 @@ export function updateAimLine(line, startWorld, endWorld) {
   }
   const positions = line.geometry.attributes.position.array;
   positions[0] = startWorld.x;
-  positions[1] = startWorld.y + 0.005;
+  positions[1] = startWorld.y;
   positions[2] = startWorld.z;
   positions[3] = endWorld.x;
-  positions[4] = endWorld.y + 0.005;
+  positions[4] = endWorld.y;
   positions[5] = endWorld.z;
   line.geometry.attributes.position.needsUpdate = true;
-  line.computeLineDistances();
+
+  // Color shifts white->red as pull power increases
+  const dx = endWorld.x - startWorld.x;
+  const dz = endWorld.z - startWorld.z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  const power = Math.min(dist / 0.15, 1.0);
+  line.material.color.setRGB(1.0, 1.0 - power * 0.7, 1.0 - power * 0.8);
+  line.material.opacity = 0.4 + power * 0.5;
+
   line.visible = true;
 }

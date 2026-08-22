@@ -15,10 +15,10 @@ export const PEN = {
   radius: 0.008,
   halfLength: 0.07,
   mass: 0.02,
-  friction: 0.36,
-  restitution: 0.4,
-  linearDamping: 4.0,
-  angularDamping: 5.0,
+  friction: 0.5,
+  restitution: 0.35,
+  linearDamping: 1.8,
+  angularDamping: 2.5,
   selectionRadius: 0.06,
 };
 
@@ -36,7 +36,7 @@ export const INPUT = {
 
 export const SETTLE = {
   speedThreshold: 0.008,
-  frames: 15, // consecutive frames below threshold = settled
+  frames: 20, // consecutive frames below threshold = settled
 };
 
 export const TURN = {

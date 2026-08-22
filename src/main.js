@@ -64,12 +64,22 @@ class PenFightGame {
 
     this.lobbyUI.onJoinRoom = async (code, name) => {
       this.lobbyUI.showConnecting('joining room...');
+
+      // Timeout: if still joining after 12s, show error
+      const joinTimeout = setTimeout(() => {
+        if (!this.playing && this.mySeat === -1) {
+          this.lobbyUI.showError('Could not reach the room. The host may have left or the code is wrong.');
+        }
+      }, 12000);
+
       try {
         await this.network.joinRoom(code, name);
+        clearTimeout(joinTimeout);
         this.mySeat = this.network.mySeat;
         this.players = this.network.players;
         this.lobbyUI.showLobby(code, this.players, false, this.mySeat);
       } catch (err) {
+        clearTimeout(joinTimeout);
         this.lobbyUI.showError(err.message);
       }
     };

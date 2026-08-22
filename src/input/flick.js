@@ -125,29 +125,23 @@ export class FlickInput {
     if (!this.dragging) return;
     this.currentScreen = { x: sx, y: sy };
 
-    // Calculate aim visualization
+    // Calculate aim visualization — show the drag-back line
+    // (from the strike point on the pen to where the finger is now)
     const dx = this.startScreen.x - sx;
     const dy = this.startScreen.y - sy;
     const pullDist = Math.sqrt(dx * dx + dy * dy);
     const power = Math.min(pullDist / INPUT.maxPullPx, 1.0);
 
-    const penPos = this.penBodies[this.dragSeat].translation();
-    const startWorld = this._screenToWorld(this.startScreen.x, this.startScreen.y);
+    // Strike point (where finger first touched the pen)
+    const strikeWorld = this._screenToWorld(this.startScreen.x, this.startScreen.y);
+    // Current finger position (where they're dragging back to)
     const currentWorld = this._screenToWorld(sx, sy);
 
-    if (startWorld && currentWorld) {
-      // Direction is from current to start (slingshot: pull back, launch forward)
-      const dirX = startWorld.x - currentWorld.x;
-      const dirZ = startWorld.z - currentWorld.z;
-      const len = Math.sqrt(dirX * dirX + dirZ * dirZ) || 1;
-
+    if (strikeWorld && currentWorld) {
+      // Show line FROM strike point TO current finger (the pull-back)
       this.onAimUpdate({
-        penPos: { x: penPos.x, y: penPos.y, z: penPos.z },
-        endPos: {
-          x: penPos.x + (dirX / len) * power * 0.15,
-          y: penPos.y,
-          z: penPos.z + (dirZ / len) * power * 0.15,
-        },
+        penPos: { x: strikeWorld.x, y: strikeWorld.y + 0.003, z: strikeWorld.z },
+        endPos: { x: currentWorld.x, y: currentWorld.y + 0.003, z: currentWorld.z },
         power,
       });
     }
