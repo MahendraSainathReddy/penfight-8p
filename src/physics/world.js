@@ -12,6 +12,8 @@ export async function initPhysics() {
 export function createWorld() {
   const world = new rapier.World(SIM.gravity);
   world.timestep = SIM.dt;
+  // More solver iterations = more accurate collision resolution, prevents overlap
+  world.numSolverIterations = 8;
   return world;
 }
 
@@ -39,10 +41,11 @@ export function createWalls(world) {
 }
 
 export function createPen(world, x, z, yaw) {
-  // Pen lies flat on desk surface. Modeled as a flat cuboid (box).
-  // Dimensions: long and thin, very short height so it stays flat
+  // Pen lies flat on desk surface. Modeled as a cuboid (box).
+  // Use a tall-enough collider so pens can't slide under each other.
+  // Y-translation is locked so the height is purely for collision detection.
   const penWidth = PEN.radius * 2;    // ~0.01m diameter
-  const penHeight = 0.004;             // very thin (flat on desk)
+  const penHeight = 0.02;             // tall collider prevents overlap/tunneling
   const penLength = PEN.halfLength * 2; // ~0.10m long
 
   const y = penHeight / 2 + 0.001; // resting just above desk
@@ -53,19 +56,23 @@ export function createPen(world, x, z, yaw) {
     .setAngularDamping(PEN.angularDamping)
     // Lock Y translation (pen stays on desk surface) and only allow Y rotation (yaw)
     .enabledTranslations(true, false, true)
-    .enabledRotations(false, true, false);
+    .enabledRotations(false, true, false)
+    // Enable CCD to prevent fast-moving pens from tunneling through each other
+    .setCcdEnabled(true);
 
   const body = world.createRigidBody(bodyDesc);
 
-  // Use a cuboid (box) collider — flat, won't roll
+  // Use a cuboid (box) collider — tall enough to always collide, won't overlap
   const colliderDesc = rapier.ColliderDesc.cuboid(
     penWidth / 2,    // half-extent X
-    penHeight / 2,   // half-extent Y (height)
+    penHeight / 2,   // half-extent Y (height) — tall to prevent under-sliding
     penLength / 2    // half-extent Z (length)
   )
     .setMass(PEN.mass)
     .setFriction(PEN.friction)
-    .setRestitution(PEN.restitution);
+    .setRestitution(PEN.restitution)
+    // Tighter contact tolerance to prevent overlap
+    .setContactForceEventThreshold(0.0);
   world.createCollider(colliderDesc, body);
 
   // Set initial yaw rotation (pen points in the yaw direction)
