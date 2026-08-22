@@ -269,7 +269,7 @@ export class NetworkManager {
           this._send(conn, { type: 'full' });
           return;
         }
-        // Check if already in (reconnect)
+        // Check if already in (reconnect or duplicate)
         const existing = this.players.find(p => p.peerId === msg.peerId);
         if (existing) {
           existing.connected = true;
@@ -277,6 +277,23 @@ export class NetworkManager {
           this._send(conn, {
             type: 'welcome',
             seat: existing.seat,
+            players: this.players,
+            roomCode: this.roomCode,
+          });
+          this._broadcastRoster();
+          return;
+        }
+
+        // Also check if same name already exists (prevent duplicates from same browser)
+        const sameName = this.players.find(p => p.name === msg.name && p.connected);
+        if (sameName) {
+          // Treat as reconnect — update their peerId
+          sameName.peerId = msg.peerId;
+          sameName.connected = true;
+          this.connections.set(msg.peerId, conn);
+          this._send(conn, {
+            type: 'welcome',
+            seat: sameName.seat,
             players: this.players,
             roomCode: this.roomCode,
           });

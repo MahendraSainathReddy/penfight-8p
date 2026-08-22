@@ -40,9 +40,14 @@ export class LobbyUI {
       </div>
     `;
 
+    let joining = false;
     document.getElementById('btn-join').addEventListener('click', () => {
+      if (joining) return; // Prevent duplicate clicks
       const name = this._getName();
       if (!name) return;
+      joining = true;
+      document.getElementById('btn-join').disabled = true;
+      document.getElementById('btn-join').textContent = 'Joining...';
       if (this.onJoinRoom) this.onJoinRoom(roomCode.toLowerCase().trim(), name);
     });
 
@@ -51,14 +56,10 @@ export class LobbyUI {
       this._showFullMenu();
     });
 
-    // Auto-focus name input
+    // Always let user confirm/change name before joining — no auto-join
     const nameInput = document.getElementById('player-name');
-    if (!savedName) {
-      setTimeout(() => nameInput.focus(), 200);
-    } else {
-      // Auto-join if name already saved
-      setTimeout(() => document.getElementById('btn-join').click(), 300);
-    }
+    setTimeout(() => nameInput.focus(), 200);
+    nameInput.select();
 
     // Allow Enter key to join
     nameInput.addEventListener('keydown', (e) => {
@@ -89,13 +90,20 @@ export class LobbyUI {
     const savedName = localStorage.getItem('pf8_name') || '';
     document.getElementById('player-name').value = savedName;
 
+    let actionInProgress = false;
+
     document.getElementById('btn-create').addEventListener('click', () => {
+      if (actionInProgress) return;
       const name = this._getName();
       if (!name) return;
+      actionInProgress = true;
+      document.getElementById('btn-create').disabled = true;
+      document.getElementById('btn-create').textContent = 'Creating...';
       if (this.onCreateRoom) this.onCreateRoom(name);
     });
 
     document.getElementById('btn-join').addEventListener('click', () => {
+      if (actionInProgress) return;
       const name = this._getName();
       if (!name) return;
       const code = document.getElementById('room-code').value.trim().toLowerCase();
@@ -103,6 +111,9 @@ export class LobbyUI {
         this._showError('Enter a room code');
         return;
       }
+      actionInProgress = true;
+      document.getElementById('btn-join').disabled = true;
+      document.getElementById('btn-join').textContent = 'Joining...';
       if (this.onJoinRoom) this.onJoinRoom(code, name);
     });
 
