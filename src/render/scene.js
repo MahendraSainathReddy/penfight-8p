@@ -44,15 +44,14 @@ export function createCamera(renderer) {
   const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 50);
 
-  // Match penfight.xyz style: perspective view from a seated position
-  // Desk should occupy ~60% of screen, with space above/below
+  // Closer camera for smaller desk — desk fills ~55-60% of screen
   if (aspect < 1) {
-    // Portrait (mobile): like sitting at a desk, looking slightly down
-    camera.position.set(0, 0.55, 0.55);
-    camera.lookAt(0, 0, 0.05);
+    // Portrait (mobile)
+    camera.position.set(0, 0.4, 0.4);
+    camera.lookAt(0, 0, 0.02);
   } else {
     // Landscape (desktop)
-    camera.position.set(0, 0.5, 0.5);
+    camera.position.set(0, 0.38, 0.38);
     camera.lookAt(0, 0, 0);
   }
   return camera;
@@ -129,8 +128,8 @@ export function createDeskMesh(scene) {
   scene.add(deskMesh);
 
   // === Desk border / frame (darker wood edge) ===
-  const borderThickness = 0.012;
-  const borderHeight = DESK.height + 0.008;
+  const borderThickness = 0.01;
+  const borderHeight = DESK.height + 0.006;
   const borderColor = 0x5c3d2e;
   
   const borders = [
@@ -151,11 +150,11 @@ export function createDeskMesh(scene) {
   }
 
   // === Desk legs ===
-  const legGeo = new THREE.CylinderGeometry(0.012, 0.014, 0.35, 8);
+  const legGeo = new THREE.CylinderGeometry(0.01, 0.012, 0.3, 8);
   const legMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.9, metalness: 0.2 });
-  const legOffsetX = DESK.width / 2 - 0.04;
-  const legOffsetZ = DESK.depth / 2 - 0.04;
-  const legY = -DESK.height - 0.175;
+  const legOffsetX = DESK.width / 2 - 0.03;
+  const legOffsetZ = DESK.depth / 2 - 0.03;
+  const legY = -DESK.height - 0.15;
   
   const legPositions = [
     [legOffsetX, legY, legOffsetZ],
@@ -202,7 +201,7 @@ export function createDeskMesh(scene) {
   });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -DESK.height - 0.35;
+  floor.position.y = -DESK.height - 0.3;
   floor.receiveShadow = true;
   scene.add(floor);
 
@@ -232,7 +231,7 @@ export function createPenMesh(scene, seatIndex) {
   group.add(barrel);
 
   // === Tip section (tapered cone at +Z end) ===
-  const tipLength = 0.02;
+  const tipLength = 0.014;
   const tipGeo = new THREE.ConeGeometry(R, tipLength, 16);
   const tipMat = new THREE.MeshStandardMaterial({
     color: 0xb0b0b0,
@@ -266,7 +265,7 @@ export function createPenMesh(scene, seatIndex) {
   group.add(capEnd);
 
   // === Gold band (ring between body and cap) ===
-  const bandGeo = new THREE.TorusGeometry(R * 1.02, 0.001, 8, 24);
+  const bandGeo = new THREE.TorusGeometry(R * 1.02, 0.0008, 8, 24);
   const bandMat = new THREE.MeshStandardMaterial({
     color: 0xd4af37,
     roughness: 0.1,
@@ -277,7 +276,7 @@ export function createPenMesh(scene, seatIndex) {
   group.add(band);
 
   // === Pocket clip ===
-  const clipGeo = new THREE.BoxGeometry(0.003, 0.002, capLength * 0.8);
+  const clipGeo = new THREE.BoxGeometry(0.002, 0.0015, capLength * 0.8);
   const clipMat = new THREE.MeshStandardMaterial({
     color: 0xcccccc,
     metalness: 0.85,

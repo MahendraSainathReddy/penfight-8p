@@ -41,9 +41,9 @@ export function createWalls(world) {
 export function createPen(world, x, z, yaw) {
   // Pen lies flat on desk surface. Modeled as a flat cuboid (box).
   // Dimensions: long and thin, very short height so it stays flat
-  const penWidth = PEN.radius * 2;    // ~0.016m diameter
-  const penHeight = 0.006;             // very thin (flat on desk)
-  const penLength = PEN.halfLength * 2; // ~0.14m long
+  const penWidth = PEN.radius * 2;    // ~0.01m diameter
+  const penHeight = 0.004;             // very thin (flat on desk)
+  const penLength = PEN.halfLength * 2; // ~0.10m long
 
   const y = penHeight / 2 + 0.001; // resting just above desk
 
@@ -104,8 +104,8 @@ export function applyFlick(body, direction, power, maxForce) {
 
 export function isPenOnDesk(body) {
   const pos = body.translation();
-  const hw = DESK.width / 2 + PEN.halfLength * 0.3;
-  const hd = DESK.depth / 2 + PEN.halfLength * 0.3;
+  const hw = DESK.width / 2 + PEN.halfLength * 0.2;
+  const hd = DESK.depth / 2 + PEN.halfLength * 0.2;
   // Pen is "out" if its center is beyond the desk edges (+ small margin)
   if (Math.abs(pos.x) > hw) return false;
   if (Math.abs(pos.z) > hd) return false;

@@ -4,22 +4,22 @@ export const MAX_PLAYERS = 8;
 export const WIN_SCORE = 3; // First to 3 round wins
 
 export const DESK = {
-  width: 0.55,   // meters — slightly smaller so desk doesn't fill screen
-  depth: 0.55,
+  width: 0.38,   // meters — compact desk, doesn't fill screen
+  depth: 0.38,
   height: 0.02,
-  friction: 0.45,
-  restitution: 0.3,
+  friction: 0.7,   // higher friction — pens grip the surface more
+  restitution: 0.25,
 };
 
 export const PEN = {
-  radius: 0.008,
-  halfLength: 0.07,
-  mass: 0.02,
-  friction: 0.5,
-  restitution: 0.35,
-  linearDamping: 1.8,
-  angularDamping: 2.5,
-  selectionRadius: 0.06,
+  radius: 0.005,       // thinner pens
+  halfLength: 0.05,    // shorter pens
+  mass: 0.015,
+  friction: 0.65,      // more grip between pens
+  restitution: 0.3,
+  linearDamping: 2.8,  // much more friction/drag — pens slow down faster
+  angularDamping: 3.5, // spin slows faster too
+  selectionRadius: 0.05,
 };
 
 export const SIM = {
@@ -29,8 +29,8 @@ export const SIM = {
 };
 
 export const INPUT = {
-  maxPullPx: 180,
-  maxForce: 0.035,
+  maxPullPx: 160,
+  maxForce: 0.025,   // reduced for smaller board
   deadzone: 5, // px
 };
 
