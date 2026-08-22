@@ -79,6 +79,9 @@ export class NetworkManager {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
           ]
         }
       });
@@ -99,6 +102,7 @@ export class NetworkManager {
           connected: true,
         }];
         this._setupHostListeners();
+        this._startKeepAlive();
         resolve(this.roomCode);
       });
 
@@ -141,6 +145,9 @@ export class NetworkManager {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
           ]
         }
       });
@@ -234,11 +241,18 @@ export class NetworkManager {
       });
 
       conn.on('close', () => {
-        this._handleDisconnect(conn.peer);
+        // Delay disconnect detection to allow brief reconnects
+        setTimeout(() => {
+          // Check if they reconnected with a new connection
+          const currentConn = this.connections.get(conn.peer);
+          if (currentConn === conn || !currentConn) {
+            this._handleDisconnect(conn.peer);
+          }
+        }, 5000);
       });
 
       conn.on('error', () => {
-        this._handleDisconnect(conn.peer);
+        // Don't immediately disconnect — wait for close event
       });
     });
   }
@@ -249,11 +263,30 @@ export class NetworkManager {
     });
 
     conn.on('close', () => {
-      if (this.onDisconnected) this.onDisconnected();
+      // Connection closed — try to reconnect before declaring lost
+      console.warn('Connection to host closed, will attempt reconnect...');
+      setTimeout(() => {
+        if (this.peer && !this.peer.destroyed && this.roomCode) {
+          const hostPeerId = this._getHostPeerId(this.roomCode);
+          const newConn = this.peer.connect(hostPeerId, { reliable: true, serialization: 'json' });
+          newConn.on('open', () => {
+            this.hostConnection = newConn;
+            this._setupGuestListeners(newConn);
+            this._send(newConn, { type: 'join', name: this.myName, peerId: this.myPeerId });
+          });
+          newConn.on('error', () => {
+            if (this.onDisconnected) this.onDisconnected();
+            if (this.onError) this.onError('Lost connection to host');
+          });
+        } else {
+          if (this.onDisconnected) this.onDisconnected();
+        }
+      }, 2000);
     });
 
-    conn.on('error', () => {
-      if (this.onError) this.onError('Connection to host lost');
+    conn.on('error', (err) => {
+      console.warn('Guest connection error:', err);
+      // Don't immediately declare disconnected — the close handler will attempt reconnect
     });
   }
 
@@ -338,6 +371,11 @@ export class NetworkManager {
         break;
       }
 
+      case 'pong': {
+        // Client is alive — update last seen (connection healthy, no action needed)
+        break;
+      }
+
       case 'leave': {
         this._handleDisconnect(conn.peer);
         break;
@@ -359,6 +397,7 @@ export class NetworkManager {
           this._joinResolve(this.roomCode);
           this._joinResolve = null;
         }
+        this._startKeepAlive();
         if (this.onConnected) this.onConnected();
         if (this.onRosterUpdate) this.onRosterUpdate(this.players);
         break;
@@ -374,6 +413,13 @@ export class NetworkManager {
 
       case 'shot':
         if (this.onShot) this.onShot(msg);
+        break;
+
+      case 'ping':
+        // Host sent a ping — respond with pong to keep connection alive
+        if (this.hostConnection) {
+          this._send(this.hostConnection, { type: 'pong', seat: this.mySeat, t: Date.now() });
+        }
         break;
 
       case 'rematch_vote':
@@ -500,6 +546,7 @@ export class NetworkManager {
   }
 
   destroy() {
+    this._stopKeepAlive();
     if (this.hostConnection) {
       this._send(this.hostConnection, { type: 'leave', seat: this.mySeat });
       this.hostConnection.close();
@@ -509,6 +556,27 @@ export class NetworkManager {
     }
     if (this.peer) {
       this.peer.destroy();
+    }
+  }
+
+  // Keepalive: host pings all clients every 8s, clients respond with pong.
+  // If no pong received in 20s, mark as disconnected.
+  _startKeepAlive() {
+    this._keepAliveInterval = setInterval(() => {
+      if (this.isHost) {
+        // Host pings all clients
+        this._broadcast({ type: 'ping', t: Date.now() });
+      } else if (this.hostConnection) {
+        // Guest sends pong to host
+        this._send(this.hostConnection, { type: 'pong', seat: this.mySeat, t: Date.now() });
+      }
+    }, 8000);
+  }
+
+  _stopKeepAlive() {
+    if (this._keepAliveInterval) {
+      clearInterval(this._keepAliveInterval);
+      this._keepAliveInterval = null;
     }
   }
 }

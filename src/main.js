@@ -354,10 +354,25 @@ class PenFightGame {
   _checkSettle() {
     if (this.gameState.phase !== 'settling') return;
 
-    // Check if all pens have settled
+    // Track how long we've been in settling phase
+    if (!this._settleStartTime) {
+      this._settleStartTime = performance.now();
+    }
+
+    // Force settle after max time to prevent getting stuck
+    const settleElapsed = performance.now() - this._settleStartTime;
+    if (settleElapsed > SETTLE.maxSettleMs) {
+      this._settleStartTime = null;
+      this._doSettle();
+      return;
+    }
+
+    // Check if all pens have settled (off-desk pens count as settled)
     let allSettled = true;
     for (let i = 0; i < this.penBodies.length; i++) {
       if (this.gameState.outs.has(i)) continue;
+      // Off-desk pens are effectively settled (they'll be declared out)
+      if (!isPenOnDesk(this.penBodies[i])) continue;
       if (!isPenSettled(this.penBodies[i])) {
         allSettled = false;
         break;
@@ -371,6 +386,7 @@ class PenFightGame {
     }
 
     if (this.settleFrames >= SETTLE.frames) {
+      this._settleStartTime = null;
       this._doSettle();
     }
   }

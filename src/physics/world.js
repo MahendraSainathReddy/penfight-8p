@@ -124,7 +124,7 @@ export function isPenSettled(body) {
   const av = body.angvel();
   const speed = Math.sqrt(lv.x * lv.x + lv.z * lv.z); // XZ only (Y is locked)
   const angSpeed = Math.abs(av.y); // Y rotation only
-  return speed < SETTLE.speedThreshold && angSpeed < 0.02;
+  return speed < SETTLE.speedThreshold && angSpeed < 0.05;
 }
 
 export { rapier };

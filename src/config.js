@@ -35,8 +35,9 @@ export const INPUT = {
 };
 
 export const SETTLE = {
-  speedThreshold: 0.008,
-  frames: 20, // consecutive frames below threshold = settled
+  speedThreshold: 0.015,   // raised threshold — high damping means very slow residual movement
+  frames: 15,              // fewer frames needed (pens stop faster with high damping)
+  maxSettleMs: 5000,       // force settle after 5s to prevent getting stuck
 };
 
 export const TURN = {
