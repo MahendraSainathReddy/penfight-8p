@@ -139,6 +139,10 @@ class PenFightGame {
       }
     };
 
+    this.network.onReaction = (msg) => {
+      this._handleReaction(msg);
+    };
+
     this.network.onPlayerLeft = (seat) => {
       if (this.playing) {
         const player = this.players.find(p => p.seat === seat);
@@ -290,7 +294,7 @@ class PenFightGame {
     this.flickInput.setPenBodies(this.penBodies);
 
     // Setup HUD
-    this.hud = new HUD(document.getElementById('hud'));
+    this.hud = new HUD(document.getElementById('hud'), (emoji) => this._onReaction(emoji));
     this._updateHUD();
 
     // Handle resize
@@ -645,6 +649,22 @@ class PenFightGame {
       return;
     }
     updateAimLine(this.aimLine, aim.penPos, aim.endPos);
+  }
+
+  _onReaction(emoji) {
+    // Send reaction to all players
+    this.network.send({ type: 'reaction', seat: this.mySeat, emoji });
+    // Show locally too
+    const color = PLAYER_COLORS[this.mySeat];
+    this.hud.showReaction('You', emoji, color.hex);
+  }
+
+  _handleReaction(msg) {
+    if (msg.seat === this.mySeat) return; // Already shown locally
+    const player = this.players.find(p => p.seat === msg.seat);
+    const name = player ? player.name : 'someone';
+    const color = PLAYER_COLORS[msg.seat];
+    this.hud.showReaction(name, msg.emoji, color.hex);
   }
 
   _checkTurnTimeout() {

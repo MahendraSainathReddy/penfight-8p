@@ -45,6 +45,7 @@ export class NetworkManager {
     this.onPlayerLeft = null;
     this.onRematchVote = null;
     this.onSyncRequest = null;
+    this.onReaction = null;
     this.onError = null;
     this.onConnected = null;
     this.onDisconnected = null;
@@ -383,6 +384,13 @@ export class NetworkManager {
         break;
       }
 
+      case 'reaction': {
+        // Relay reaction to all other players
+        this._broadcast(msg, conn.peer);
+        if (this.onReaction) this.onReaction(msg);
+        break;
+      }
+
       case 'leave': {
         this._handleDisconnect(conn.peer);
         break;
@@ -427,6 +435,10 @@ export class NetworkManager {
         if (this.hostConnection) {
           this._send(this.hostConnection, { type: 'pong', seat: this.mySeat, t: Date.now() });
         }
+        break;
+
+      case 'reaction':
+        if (this.onReaction) this.onReaction(msg);
         break;
 
       case 'rematch_vote':

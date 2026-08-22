@@ -1,26 +1,99 @@
 import { PLAYER_COLORS } from '../config.js';
 
+const REACTION_EMOJIS = ['😂', '🔥', '💀', '👏', '😤', '🎯'];
+
 /**
- * In-game HUD: scoreboard, turn indicator, results, notifications.
+ * In-game HUD: scoreboard, turn indicator, results, notifications, reactions.
  */
 export class HUD {
-  constructor(container) {
+  constructor(container, onReaction) {
     this.container = container;
+    this.onReaction = onReaction; // callback when user sends a reaction
     this.container.innerHTML = `
       <div id="hud-scoreboard" class="hud-scoreboard"></div>
+      <div id="hud-reactions" class="hud-reactions"></div>
       <div id="hud-turn" class="hud-turn"></div>
       <div id="hud-notify" class="hud-notify"></div>
       <div id="hud-result" class="hud-result hidden"></div>
+      <button id="hud-landscape" class="hud-landscape-btn" title="Toggle landscape">&#x26F6;</button>
+      <div id="hud-reaction-toast" class="hud-reaction-toast"></div>
     `;
     this.scoreboard = document.getElementById('hud-scoreboard');
     this.turnEl = document.getElementById('hud-turn');
     this.notifyEl = document.getElementById('hud-notify');
     this.resultEl = document.getElementById('hud-result');
+    this.reactionsEl = document.getElementById('hud-reactions');
+    this.reactionToastEl = document.getElementById('hud-reaction-toast');
     this.notifyTimer = null;
+
+    this._setupLandscapeButton();
+    this._setupReactions();
+  }
+
+  _setupLandscapeButton() {
+    const btn = document.getElementById('hud-landscape');
+    btn.addEventListener('click', async () => {
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          const isLandscape = screen.orientation.type.includes('landscape');
+          if (isLandscape) {
+            await screen.orientation.unlock();
+            if (document.fullscreenElement) await document.exitFullscreen();
+          } else {
+            await document.documentElement.requestFullscreen();
+            await screen.orientation.lock('landscape');
+          }
+        } else {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          } else {
+            await document.exitFullscreen();
+          }
+        }
+      } catch (e) {
+        try {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          } else {
+            await document.exitFullscreen();
+          }
+        } catch (e2) { /* not supported */ }
+      }
+    });
+  }
+
+  _setupReactions() {
+    const html = REACTION_EMOJIS.map(emoji =>
+      `<button class="reaction-btn" data-emoji="${emoji}">${emoji}</button>`
+    ).join('');
+    this.reactionsEl.innerHTML = html;
+
+    this.reactionsEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.reaction-btn');
+      if (!btn) return;
+      const emoji = btn.dataset.emoji;
+      if (this.onReaction) this.onReaction(emoji);
+      // Brief visual feedback
+      btn.classList.add('sent');
+      setTimeout(() => btn.classList.remove('sent'), 400);
+    });
+  }
+
+  showReaction(playerName, emoji, color) {
+    const toast = document.createElement('div');
+    toast.className = 'reaction-toast-item';
+    toast.innerHTML = `<span style="color:${color}">${escapeHtml(playerName)}</span> ${emoji}`;
+    this.reactionToastEl.appendChild(toast);
+    // Animate in then remove
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
   }
 
   updateScoreboard(players, scores, outs, mySeat) {
-    const items = players.map((p, idx) => {
+    const items = players.map((p) => {
       const color = PLAYER_COLORS[p.seat];
       const isOut = outs.has ? outs.has(p.seat) : (outs || []).includes(p.seat);
       const isMe = p.seat === mySeat;
@@ -69,7 +142,7 @@ export class HUD {
     const scoreText = players.map(p => {
       const color = PLAYER_COLORS[p.seat];
       return `<span style="color:${color.hex}">${escapeHtml(p.name)}: ${scores[p.seat]}</span>`;
-    }).join(' · ');
+    }).join(' &middot; ');
 
     this.resultEl.innerHTML = `
       <div class="match-end">
@@ -103,7 +176,7 @@ export class HUD {
     const btn = document.getElementById('btn-rematch');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Voted ✓';
+      btn.textContent = 'Voted \u2713';
     }
   }
 
