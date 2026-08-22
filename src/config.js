@@ -4,8 +4,8 @@ export const MAX_PLAYERS = 8;
 export const WIN_SCORE = 3; // First to 3 round wins
 
 export const DESK = {
-  width: 0.7,   // meters (wider for 8 pens)
-  depth: 0.7,
+  width: 0.55,   // meters — slightly smaller so desk doesn't fill screen
+  depth: 0.55,
   height: 0.02,
   friction: 0.45,
   restitution: 0.3,
@@ -62,10 +62,10 @@ export const PLAYER_COLORS = [
 // For 4+: spread around the desk
 export function getPenStartPosition(seatIndex, totalPlayers) {
   if (totalPlayers === 2) {
-    // Two players face each other vertically
+    // Two players face each other — tips pointing at opponent
     const positions = [
-      { x: 0, z: -DESK.depth * 0.28, yaw: Math.PI * 0.1 },   // top (slight angle)
-      { x: 0, z:  DESK.depth * 0.28, yaw: -Math.PI * 0.1 },  // bottom (slight angle)
+      { x: -0.05, z: -DESK.depth * 0.22, yaw: Math.PI * 0.6 },  // top pen, tip pointing down-right
+      { x:  0.05, z:  DESK.depth * 0.22, yaw: -Math.PI * 0.4 },  // bottom pen, tip pointing up-left
     ];
     return positions[seatIndex];
   }

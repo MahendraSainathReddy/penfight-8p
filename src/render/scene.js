@@ -44,14 +44,16 @@ export function createCamera(renderer) {
   const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 50);
 
+  // Match penfight.xyz style: perspective view from a seated position
+  // Desk should occupy ~60% of screen, with space above/below
   if (aspect < 1) {
-    // Portrait (mobile): nearly top-down, pull back enough to see full desk
-    camera.position.set(0, 1.0, 0.15);
-    camera.lookAt(0, 0, 0);
+    // Portrait (mobile): like sitting at a desk, looking slightly down
+    camera.position.set(0, 0.55, 0.55);
+    camera.lookAt(0, 0, 0.05);
   } else {
-    // Landscape (desktop): angled view
-    camera.position.set(0, 0.75, 0.4);
-    camera.lookAt(0, 0, -0.02);
+    // Landscape (desktop)
+    camera.position.set(0, 0.5, 0.5);
+    camera.lookAt(0, 0, 0);
   }
   return camera;
 }
