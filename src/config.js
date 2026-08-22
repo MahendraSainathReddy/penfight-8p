@@ -40,8 +40,7 @@ export const SETTLE = {
 };
 
 export const TURN = {
-  timeoutWarnMs: 20000,
-  timeoutForceMs: 45000,
+  // No timeout — players take as long as they need
 };
 
 // 8 player colors

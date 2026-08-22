@@ -43,6 +43,7 @@ export class NetworkManager {
     this.onPass = null;
     this.onNextRound = null;
     this.onPlayerLeft = null;
+    this.onRematchVote = null;
     this.onError = null;
     this.onConnected = null;
     this.onDisconnected = null;
@@ -313,6 +314,13 @@ export class NetworkManager {
         break;
       }
 
+      case 'rematch_vote': {
+        // Relay to all other players
+        this._broadcast(msg, conn.peer);
+        if (this.onRematchVote) this.onRematchVote(msg);
+        break;
+      }
+
       case 'leave': {
         this._handleDisconnect(conn.peer);
         break;
@@ -349,6 +357,10 @@ export class NetworkManager {
 
       case 'shot':
         if (this.onShot) this.onShot(msg);
+        break;
+
+      case 'rematch_vote':
+        if (this.onRematchVote) this.onRematchVote(msg);
         break;
 
       case 'settled':

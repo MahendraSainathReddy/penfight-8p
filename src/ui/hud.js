@@ -79,6 +79,7 @@ export class HUD {
           <button id="btn-rematch" class="btn btn-primary">Rematch</button>
           <button id="btn-leave" class="btn btn-secondary">Leave</button>
         </div>
+        <p id="rematch-status" class="rematch-status"></p>
       </div>
     `;
     this.resultEl.classList.remove('hidden');
@@ -86,6 +87,24 @@ export class HUD {
 
     document.getElementById('btn-rematch').addEventListener('click', onRematch);
     document.getElementById('btn-leave').addEventListener('click', onLeave);
+  }
+
+  updateRematchStatus(votedNames, totalNeeded) {
+    const el = document.getElementById('rematch-status');
+    if (!el) return;
+    if (votedNames.length === 0) {
+      el.textContent = '';
+    } else {
+      el.textContent = `Rematch: ${votedNames.join(', ')} (${votedNames.length}/${totalNeeded})`;
+    }
+  }
+
+  disableRematchButton() {
+    const btn = document.getElementById('btn-rematch');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Voted ✓';
+    }
   }
 
   hideResult() {

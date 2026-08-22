@@ -5,7 +5,7 @@ import { GameState } from './game/state.js';
 import { NetworkManager } from './net/network.js';
 import { LobbyUI } from './ui/lobby.js';
 import { HUD } from './ui/hud.js';
-import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, TURN, getPenStartPosition } from './config.js';
+import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, getPenStartPosition } from './config.js';
 
 class PenFightGame {
   constructor() {
@@ -126,6 +126,10 @@ class PenFightGame {
 
     this.network.onNextRound = (msg) => {
       this._applyNextRound(msg);
+    };
+
+    this.network.onRematchVote = (msg) => {
+      this._handleRematchVote(msg.seat);
     };
 
     this.network.onPlayerLeft = (seat) => {
@@ -513,17 +517,59 @@ class PenFightGame {
   }
 
   _onRematch() {
-    this.hud.hideResult();
-    if (this.network.isHost) {
-      // Host restarts the game
-      this.gameState = new GameState(this.players.length);
-      this._restartGameState();
-      const state = this.gameState.serialize();
-      this.network.startGame(state);
-    } else {
-      // Guest waits — show a waiting message
-      this.hud.notify('Waiting for host to restart...', 5000);
+    // Send rematch vote — game only restarts when all connected players agree
+    if (this.rematchVotes && this.rematchVotes.has(this.mySeat)) return; // Already voted
+
+    if (!this.rematchVotes) {
+      this.rematchVotes = new Set();
     }
+    this.rematchVotes.add(this.mySeat);
+    this.hud.disableRematchButton();
+
+    // Send vote to network
+    this.network.send({ type: 'rematch_vote', seat: this.mySeat });
+
+    // If host, also handle own vote
+    if (this.network.isHost) {
+      this._handleRematchVote(this.mySeat);
+    }
+
+    this._updateRematchStatus();
+  }
+
+  _handleRematchVote(seat) {
+    if (!this.rematchVotes) {
+      this.rematchVotes = new Set();
+    }
+    this.rematchVotes.add(seat);
+    this._updateRematchStatus();
+
+    // Check if all connected players have voted
+    const connectedPlayers = this.players.filter(p => p.connected !== false);
+    const allVoted = connectedPlayers.every(p => this.rematchVotes.has(p.seat));
+
+    if (allVoted && connectedPlayers.length >= 2) {
+      // Everyone agreed — start the rematch
+      this.rematchVotes = null;
+      this.hud.hideResult();
+      if (this.network.isHost) {
+        this.gameState = new GameState(this.players.length);
+        this._restartGameState();
+        const state = this.gameState.serialize();
+        this.network.startGame(state);
+      }
+    }
+  }
+
+  _updateRematchStatus() {
+    if (!this.rematchVotes || !this.hud) return;
+    const connectedPlayers = this.players.filter(p => p.connected !== false);
+    const votedNames = [];
+    for (const seat of this.rematchVotes) {
+      const p = this.players.find(pl => pl.seat === seat);
+      if (p) votedNames.push(p.name);
+    }
+    this.hud.updateRematchStatus(votedNames, connectedPlayers.length);
   }
 
   _restartGameState() {
@@ -553,6 +599,7 @@ class PenFightGame {
     this.settleFrames = 0;
     this.turnStartTime = performance.now();
     this.turnWarned = false;
+    this.rematchVotes = null; // Reset votes
 
     // Reset pen positions
     this._restartGameState();
@@ -578,26 +625,7 @@ class PenFightGame {
   }
 
   _checkTurnTimeout() {
-    if (!this.gameState || this.gameState.phase !== 'aiming') return;
-    if (this.gameState.activeSeat !== this.mySeat) return;
-
-    const elapsed = performance.now() - this.turnStartTime;
-
-    if (!this.turnWarned && elapsed > TURN.timeoutWarnMs) {
-      this.turnWarned = true;
-      this.hud.notify('Flick soon or lose your turn!', 3000);
-    }
-
-    if (elapsed > TURN.timeoutForceMs) {
-      // Auto pass
-      if (this.gameState.pass(this.mySeat)) {
-        this.network.send({ type: 'pass', seat: this.mySeat, state: this.gameState.serialize() });
-        this.turnStartTime = performance.now();
-        this.turnWarned = false;
-        this.hud.notify('Turn skipped (timeout)');
-        this._updateHUD();
-      }
-    }
+    // No timeout — players take as long as they need
   }
 
   _updateHUD() {
