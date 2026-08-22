@@ -12,6 +12,61 @@ export class LobbyUI {
   }
 
   showMenu() {
+    // Check if URL has a room code — show join-only view
+    const params = new URLSearchParams(window.location.search);
+    const roomFromUrl = params.get('room');
+
+    if (roomFromUrl) {
+      this._showJoinView(roomFromUrl);
+      return;
+    }
+
+    this._showFullMenu();
+  }
+
+  _showJoinView(roomCode) {
+    const savedName = localStorage.getItem('pf8_name') || '';
+
+    this.container.innerHTML = `
+      <div class="lobby-card">
+        <h1 class="logo">PEN FIGHT</h1>
+        <p class="subtitle">you've been invited!</p>
+        <p class="eyebrow">ROOM: <b>${roomCode.toUpperCase()}</b></p>
+        <div class="menu-section">
+          <input type="text" id="player-name" placeholder="your name" maxlength="12" class="input-field" value="${escapeHtml(savedName)}" />
+        </div>
+        <button id="btn-join" class="btn btn-primary">Join Game</button>
+        <button id="btn-back" class="btn btn-secondary" style="margin-top: 0.5rem;">Back to menu</button>
+      </div>
+    `;
+
+    document.getElementById('btn-join').addEventListener('click', () => {
+      const name = this._getName();
+      if (!name) return;
+      if (this.onJoinRoom) this.onJoinRoom(roomCode.toLowerCase().trim(), name);
+    });
+
+    document.getElementById('btn-back').addEventListener('click', () => {
+      window.history.replaceState(null, '', window.location.pathname);
+      this._showFullMenu();
+    });
+
+    // Auto-focus name input
+    const nameInput = document.getElementById('player-name');
+    if (!savedName) {
+      setTimeout(() => nameInput.focus(), 200);
+    } else {
+      // Auto-join if name already saved
+      setTimeout(() => document.getElementById('btn-join').click(), 300);
+    }
+
+    // Allow Enter key to join
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('btn-join').click();
+    });
+  }
+
+  _showFullMenu() {
     this.container.innerHTML = `
       <div class="lobby-card">
         <h1 class="logo">PEN FIGHT</h1>
@@ -51,23 +106,12 @@ export class LobbyUI {
       if (this.onJoinRoom) this.onJoinRoom(code, name);
     });
 
-    // Check URL for room code — auto-join if name is saved
-    const params = new URLSearchParams(window.location.search);
-    const roomFromUrl = params.get('room');
-    if (roomFromUrl) {
-      document.getElementById('room-code').value = roomFromUrl;
-      // Auto-join if we have a saved name
-      const savedNameForJoin = localStorage.getItem('pf8_name') || '';
-      if (savedNameForJoin.length >= 2) {
-        // Small delay to allow UI to render, then auto-join
-        setTimeout(() => {
-          document.getElementById('player-name').value = savedNameForJoin;
-          document.getElementById('btn-join').click();
-        }, 300);
-      } else {
-        // Show hint to enter name then join
-        this._showError('Enter your name, then click Join');
-      }
+    // Allow Enter on room code to join
+    const codeInput = document.getElementById('room-code');
+    if (codeInput) {
+      codeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('btn-join').click();
+      });
     }
   }
 
