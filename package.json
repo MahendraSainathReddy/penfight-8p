@@ -1,0 +1,19 @@
+{
+  "name": "penfight-8p",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "0.14.0",
+    "peerjs": "1.5.4",
+    "three": "0.169.0"
+  },
+  "devDependencies": {
+    "vite": "6.0.0"
+  }
+}
