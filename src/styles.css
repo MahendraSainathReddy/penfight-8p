@@ -483,6 +483,7 @@ html, body {
   backdrop-filter: blur(6px);
   transition: background 0.2s;
   z-index: 20;
+  pointer-events: auto;
 }
 
 .hud-landscape-btn:active {
@@ -498,6 +499,7 @@ html, body {
   flex-direction: column;
   gap: 6px;
   z-index: 15;
+  pointer-events: auto;
 }
 
 .reaction-btn {
@@ -513,6 +515,7 @@ html, body {
   justify-content: center;
   backdrop-filter: blur(6px);
   transition: transform 0.15s, background 0.15s;
+  pointer-events: auto;
 }
 
 .reaction-btn:active,

@@ -440,12 +440,15 @@ class PenFightGame {
         : `${this._seatName(result.winner)} wins round ${this.gameState.round}!`;
       this.hud.showRoundResult(text);
 
-      // Auto advance to next round after delay
-      setTimeout(() => {
-        if (this.gameState.phase === 'round_result') {
-          this._advanceRound();
-        }
-      }, 3000);
+      // Only the host auto-advances to next round after delay
+      // Guests wait for the host's next_round message
+      if (this.network.isHost) {
+        setTimeout(() => {
+          if (this.gameState.phase === 'round_result') {
+            this._advanceRound();
+          }
+        }, 3000);
+      }
     }
 
     // Host broadcasts settle

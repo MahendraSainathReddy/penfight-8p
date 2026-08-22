@@ -15,7 +15,7 @@ export class HUD {
       <div id="hud-turn" class="hud-turn"></div>
       <div id="hud-notify" class="hud-notify"></div>
       <div id="hud-result" class="hud-result hidden"></div>
-      <button id="hud-landscape" class="hud-landscape-btn" title="Toggle landscape">&#x26F6;</button>
+      <button id="hud-landscape" class="hud-landscape-btn" title="Fullscreen">&#x26F6;</button>
       <div id="hud-reaction-toast" class="hud-reaction-toast"></div>
     `;
     this.scoreboard = document.getElementById('hud-scoreboard');
