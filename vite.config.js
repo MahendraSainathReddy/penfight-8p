@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: './',
+  base: '/penfight-8p/',
   build: {
     outDir: 'dist',
     target: 'esnext',
