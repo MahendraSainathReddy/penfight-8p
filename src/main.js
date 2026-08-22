@@ -133,6 +133,69 @@ class PenFightGame {
         const player = this.players.find(p => p.seat === seat);
         const name = player ? player.name : 'A player';
         this.hud.notify(`${name} left the game`);
+
+        // Mark their pen as out
+        if (!this.gameState.outs.has(seat)) {
+          this.gameState.outs.add(seat);
+          this.gameState.revision++;
+          // Hide their pen
+          if (this.penMeshes[seat]) {
+            this.penMeshes[seat].visible = false;
+          }
+        }
+
+        // Check if only 1 player remains — they win
+        const alive = this.gameState.getActivePlayers();
+        if (alive.length <= 1) {
+          const winner = alive.length === 1 ? alive[0] : null;
+          if (winner !== null) {
+            this.gameState.scores[winner]++;
+            this.gameState.winner = winner;
+            this.gameState.phase = 'match_end';
+            this.gameState.revision++;
+            const winnerPlayer = this.players.find(p => p.seat === winner);
+            this.hud.showMatchEnd(
+              winnerPlayer ? winnerPlayer.name : 'someone',
+              this.gameState.scores,
+              this.players,
+              this.mySeat,
+              () => this._onRematch(),
+              () => this._onLeave()
+            );
+            // Host broadcasts the result
+            if (this.network.isHost) {
+              this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+            }
+          }
+        } else {
+          // If the disconnected player was the active shooter, advance turn
+          if (this.gameState.phase === 'aiming' && this.gameState.activeSeat === seat) {
+            const next = this.gameState.getNextSeat(seat);
+            if (next !== null) {
+              this.gameState.activeSeat = next;
+              this.gameState.revision++;
+              this.turnStartTime = performance.now();
+              this.turnWarned = false;
+            }
+          }
+          // If settling and active seat was this player, move on
+          if (this.gameState.phase === 'settling' && this.gameState.activeSeat === seat) {
+            this.gameState.phase = 'aiming';
+            const next = this.gameState.getNextSeat(seat);
+            if (next !== null) {
+              this.gameState.activeSeat = next;
+              this.gameState.revision++;
+              this.turnStartTime = performance.now();
+              this.turnWarned = false;
+            }
+          }
+          // Host syncs state to keep everyone aligned
+          if (this.network.isHost) {
+            this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+          }
+        }
+
+        this._updateHUD();
       }
     };
 
@@ -591,8 +654,8 @@ class PenFightGame {
     // Sync meshes to physics
     for (let i = 0; i < this.penBodies.length; i++) {
       syncPenMesh(this.penMeshes[i], this.penBodies[i]);
-      // Hide pens that are out of the game (based on game state)
-      this.penMeshes[i].visible = !this.gameState.outs.has(i);
+      // Hide pens that are out OR have fallen off the desk edge
+      this.penMeshes[i].visible = !this.gameState.outs.has(i) && isPenOnDesk(this.penBodies[i]);
     }
 
     // Freeze pens that have gone off desk (stop them sliding forever)
