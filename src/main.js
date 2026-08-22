@@ -132,6 +132,13 @@ class PenFightGame {
       this._handleRematchVote(msg.seat);
     };
 
+    this.network.onSyncRequest = (seat) => {
+      // A client came back from background — send them current state
+      if (this.network.isHost && this.gameState) {
+        this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+      }
+    };
+
     this.network.onPlayerLeft = (seat) => {
       if (this.playing) {
         const player = this.players.find(p => p.seat === seat);
@@ -681,8 +688,27 @@ class PenFightGame {
   _gameLoop(time) {
     this.animFrame = requestAnimationFrame((t) => this._gameLoop(t));
 
-    const dt = Math.min(time - this.lastTime, 100); // cap at 100ms
+    const rawDt = time - this.lastTime;
     this.lastTime = time;
+
+    // If returning from background (>500ms gap), don't run physics catch-up.
+    // Instead, request a state sync from host to get back in sync.
+    if (rawDt > 500) {
+      this.accumulator = 0;
+      // Request sync from host if we're a guest
+      if (!this.network.isHost && this.network.hostConnection) {
+        this.network._send(this.network.hostConnection, { type: 'request_sync', seat: this.mySeat });
+      }
+      // Render current state
+      for (let i = 0; i < this.penBodies.length; i++) {
+        syncPenMesh(this.penMeshes[i], this.penBodies[i]);
+        this.penMeshes[i].visible = !this.gameState.outs.has(i) && isPenOnDesk(this.penBodies[i]);
+      }
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
+
+    const dt = Math.min(rawDt, 50); // tighter cap
     this.accumulator += dt / 1000;
 
     // Step physics — all clients simulate for visual smoothness

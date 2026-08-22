@@ -44,6 +44,7 @@ export class NetworkManager {
     this.onNextRound = null;
     this.onPlayerLeft = null;
     this.onRematchVote = null;
+    this.onSyncRequest = null;
     this.onError = null;
     this.onConnected = null;
     this.onDisconnected = null;
@@ -373,6 +374,12 @@ export class NetworkManager {
 
       case 'pong': {
         // Client is alive — update last seen (connection healthy, no action needed)
+        break;
+      }
+
+      case 'request_sync': {
+        // Client came back from background and needs current state
+        if (this.onSyncRequest) this.onSyncRequest(msg.seat);
         break;
       }
 
