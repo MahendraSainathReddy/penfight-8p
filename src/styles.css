@@ -334,14 +334,13 @@ html, body {
 /* Turn indicator */
 .hud-turn {
   position: absolute;
-  top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 10px 24px;
-  border-radius: 24px;
+  bottom: 16px;
+  right: 16px;
+  padding: 8px 16px;
+  border-radius: 20px;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 500;
   white-space: nowrap;
   transition: all 0.3s ease;
@@ -509,9 +508,10 @@ html, body {
   }
 
   .hud-turn {
-    top: 50px;
-    font-size: 0.8rem;
-    padding: 8px 18px;
+    bottom: 12px;
+    right: 12px;
+    font-size: 0.75rem;
+    padding: 6px 12px;
   }
 
   .btn {

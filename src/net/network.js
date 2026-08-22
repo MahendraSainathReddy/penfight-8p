@@ -241,14 +241,14 @@ export class NetworkManager {
       });
 
       conn.on('close', () => {
-        // Delay disconnect detection to allow brief reconnects
+        // Delay disconnect detection to allow orientation changes and brief reconnects
         setTimeout(() => {
           // Check if they reconnected with a new connection
           const currentConn = this.connections.get(conn.peer);
           if (currentConn === conn || !currentConn) {
             this._handleDisconnect(conn.peer);
           }
-        }, 5000);
+        }, 10000);
       });
 
       conn.on('error', () => {
@@ -560,7 +560,6 @@ export class NetworkManager {
   }
 
   // Keepalive: host pings all clients every 8s, clients respond with pong.
-  // If no pong received in 20s, mark as disconnected.
   _startKeepAlive() {
     this._keepAliveInterval = setInterval(() => {
       if (this.isHost) {
@@ -571,12 +570,34 @@ export class NetworkManager {
         this._send(this.hostConnection, { type: 'pong', seat: this.mySeat, t: Date.now() });
       }
     }, 8000);
+
+    // Handle page visibility changes (orientation change, tab switch, etc.)
+    // Prevent false disconnects when the page is briefly hidden
+    this._visibilityHandler = () => {
+      if (document.visibilityState === 'visible') {
+        // Page came back — send an immediate keepalive to show we're still here
+        if (this.isHost) {
+          this._broadcast({ type: 'ping', t: Date.now() });
+        } else if (this.hostConnection && this.hostConnection.open) {
+          this._send(this.hostConnection, { type: 'pong', seat: this.mySeat, t: Date.now() });
+        }
+        // Reconnect peer to signaling server if disconnected
+        if (this.peer && !this.peer.destroyed && this.peer.disconnected) {
+          this.peer.reconnect();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', this._visibilityHandler);
   }
 
   _stopKeepAlive() {
     if (this._keepAliveInterval) {
       clearInterval(this._keepAliveInterval);
       this._keepAliveInterval = null;
+    }
+    if (this._visibilityHandler) {
+      document.removeEventListener('visibilitychange', this._visibilityHandler);
+      this._visibilityHandler = null;
     }
   }
 }
