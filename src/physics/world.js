@@ -44,9 +44,9 @@ export function createPen(world, x, z, yaw) {
   // Pen lies flat on desk surface. Modeled as a cuboid (box).
   // Use a tall-enough collider so pens can't slide under each other.
   // Y-translation is locked so the height is purely for collision detection.
-  const penWidth = PEN.radius * 2;    // ~0.01m diameter
+  const penWidth = PEN.radius * 2;    // ~0.008m diameter
   const penHeight = 0.02;             // tall collider prevents overlap/tunneling
-  const penLength = PEN.halfLength * 2; // ~0.10m long
+  const penLength = PEN.halfLength * 2; // ~0.076m long
 
   const y = penHeight / 2 + 0.001; // resting just above desk
 
