@@ -18,7 +18,8 @@ export class FlickInput {
     this.currentScreen = null;
     this.penBodies = []; // set externally
     this.raycaster = new THREE.Raycaster();
-    this.deskPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    // Intersect at pen body height so aim lines align with pen positions
+    this.deskPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.011);
 
     this._bindEvents();
   }

@@ -7,7 +7,7 @@ export const DESK = {
   width: 0.50,   // meters — larger board for better gameplay
   depth: 0.50,
   height: 0.02,
-  friction: 1.2,   // very high friction — pens grip hard, no sliding
+  friction: 1.0,   // high friction but not extreme
   restitution: 0.15,
 };
 
@@ -15,10 +15,10 @@ export const PEN = {
   radius: 0.004,       // smaller visible pens
   halfLength: 0.038,   // shorter pens — less dominant on board
   mass: 0.012,
-  friction: 1.0,       // very high grip between pens
+  friction: 0.85,      // good grip between pens
   restitution: 0.2,
-  linearDamping: 6.0,  // extremely high drag — pens stop very quickly
-  angularDamping: 6.5, // spin dies almost immediately
+  linearDamping: 5.0,  // high drag — pens stop quickly
+  angularDamping: 5.5, // spin dies fast
   selectionRadius: 0.05,
 };
 

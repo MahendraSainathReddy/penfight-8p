@@ -46,13 +46,13 @@ export function createCamera(renderer) {
 
   // Camera positioned to see the desk well on both orientations
   if (aspect < 1) {
-    // Portrait (mobile) — pull back a bit to see the full desk
-    camera.position.set(0, 0.5, 0.5);
-    camera.lookAt(0, 0, 0.02);
+    // Portrait (mobile) — pull back, look slightly above desk center
+    camera.position.set(0, 0.55, 0.45);
+    camera.lookAt(0, 0, -0.03);
   } else {
-    // Landscape (mobile/desktop) — lower angle, closer, desk fills screen
-    camera.position.set(0, 0.4, 0.35);
-    camera.lookAt(0, 0, 0);
+    // Landscape (mobile/desktop) — desk centered with space on all sides
+    camera.position.set(0, 0.42, 0.38);
+    camera.lookAt(0, 0, -0.02);
   }
   return camera;
 }

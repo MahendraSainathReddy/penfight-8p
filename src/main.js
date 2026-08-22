@@ -791,13 +791,13 @@ class PenFightGame {
 
     // Reposition camera based on new orientation
     if (aspect < 1) {
-      // Portrait
-      this.camera.position.set(0, 0.5, 0.5);
-      this.camera.lookAt(0, 0, 0.02);
+      // Portrait — pull back more, look slightly above desk center for even spacing
+      this.camera.position.set(0, 0.55, 0.45);
+      this.camera.lookAt(0, 0, -0.03);
     } else {
-      // Landscape
-      this.camera.position.set(0, 0.4, 0.35);
-      this.camera.lookAt(0, 0, 0);
+      // Landscape — look slightly above center so desk has space on all sides
+      this.camera.position.set(0, 0.42, 0.38);
+      this.camera.lookAt(0, 0, -0.02);
     }
   }
 }
