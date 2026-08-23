@@ -349,7 +349,7 @@ class PenFightGame {
     this.flickInput.setPenBodies(this.penBodies);
 
     // Setup HUD
-    this.hud = new HUD(document.getElementById('hud'), (emoji) => this._onReaction(emoji));
+    this.hud = new HUD(document.getElementById('hud'), (emoji) => this._onReaction(emoji), () => this._onLeave());
     this._updateHUD();
 
     // Handle resize (only bind once)
@@ -424,7 +424,7 @@ class PenFightGame {
     this.flickInput.setPenBodies(this.penBodies);
 
     // Setup HUD (spectator mode)
-    this.hud = new HUD(document.getElementById('hud'), (emoji) => this._onReaction(emoji));
+    this.hud = new HUD(document.getElementById('hud'), (emoji) => this._onReaction(emoji), () => this._onLeave());
     this.hud.notify('Spectating...', 4000);
     this._updateHUD();
 

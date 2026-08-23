@@ -6,15 +6,17 @@ const REACTION_EMOJIS = ['😂', '🔥', '💀', '👏', '😤', '😭'];
  * In-game HUD: scoreboard, turn indicator, results, notifications, reactions.
  */
 export class HUD {
-  constructor(container, onReaction) {
+  constructor(container, onReaction, onLeave) {
     this.container = container;
     this.onReaction = onReaction; // callback when user sends a reaction
+    this.onLeave = onLeave; // callback when user wants to leave
     this.container.innerHTML = `
       <div id="hud-scoreboard" class="hud-scoreboard"></div>
       <div id="hud-reactions" class="hud-reactions"></div>
       <div id="hud-turn" class="hud-turn"></div>
       <div id="hud-notify" class="hud-notify"></div>
       <div id="hud-result" class="hud-result hidden"></div>
+      <button id="hud-leave" class="hud-leave-btn" title="Leave game">&#x2715;</button>
       <button id="hud-landscape" class="hud-landscape-btn" title="Fullscreen">&#x26F6;</button>
       <div id="hud-reaction-toast" class="hud-reaction-toast"></div>
     `;
@@ -27,7 +29,17 @@ export class HUD {
     this.notifyTimer = null;
 
     this._setupLandscapeButton();
+    this._setupLeaveButton();
     this._setupReactions();
+  }
+
+  _setupLeaveButton() {
+    const btn = document.getElementById('hud-leave');
+    btn.addEventListener('click', () => {
+      if (confirm('Leave the game?')) {
+        if (this.onLeave) this.onLeave();
+      }
+    });
   }
 
   _setupLandscapeButton() {

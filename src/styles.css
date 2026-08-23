@@ -688,3 +688,29 @@ html, body {
   pointer-events: none;
   z-index: 10;
 }
+
+/* === Leave Button === */
+.hud-leave-btn {
+  position: absolute;
+  bottom: 60px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  background: rgba(0, 0, 0, 0.6);
+  color: #ff6b6b;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  transition: background 0.2s;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.hud-leave-btn:active {
+  background: rgba(255, 100, 100, 0.3);
+}
