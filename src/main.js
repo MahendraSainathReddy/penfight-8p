@@ -320,9 +320,10 @@ class PenFightGame {
     this.renderer = createRenderer();
     document.getElementById('game-canvas').appendChild(this.renderer.domElement);
     this.scene = createScene();
-    this.camera = createCamera(this.renderer);
     const deskScale = getDeskScale(totalPlayers);
     setDeskScale(deskScale);
+    this._currentDeskScale = deskScale;
+    this.camera = createCamera(this.renderer, deskScale);
     createDeskMesh(this.scene, deskScale);
     this.aimLine = createAimLine(this.scene);
 
@@ -415,9 +416,10 @@ class PenFightGame {
     this.renderer = createRenderer();
     document.getElementById('game-canvas').appendChild(this.renderer.domElement);
     this.scene = createScene();
-    this.camera = createCamera(this.renderer);
     const deskScale = getDeskScale(totalPlayers);
     setDeskScale(deskScale);
+    this._currentDeskScale = deskScale;
+    this.camera = createCamera(this.renderer, deskScale);
     createDeskMesh(this.scene, deskScale);
     this.aimLine = createAimLine(this.scene);
 
@@ -866,6 +868,11 @@ class PenFightGame {
     this.turnWarned = false;
     this.rematchVotes = null; // Reset votes
 
+    // Re-apply desk scale in case player count changed
+    const deskScale = getDeskScale(stateData.totalPlayers);
+    setDeskScale(deskScale);
+    this._currentDeskScale = deskScale;
+
     // Reset pen positions
     this._restartGameState();
 
@@ -1065,14 +1072,15 @@ class PenFightGame {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
-    // Reposition camera — ensure full desk visible with margin on all sides
+    // Scale camera position based on current desk scale
+    const scale = this._currentDeskScale || 1.0;
     if (aspect < 1) {
-      // Portrait — higher up, further back
-      this.camera.position.set(0, 0.6, 0.55);
+      // Portrait
+      this.camera.position.set(0, 0.6 * scale, 0.55 * scale);
       this.camera.lookAt(0, 0, 0);
     } else {
-      // Landscape — higher and further back so bottom edge is visible
-      this.camera.position.set(0, 0.5, 0.45);
+      // Landscape
+      this.camera.position.set(0, 0.5 * scale, 0.45 * scale);
       this.camera.lookAt(0, 0, 0);
     }
   }

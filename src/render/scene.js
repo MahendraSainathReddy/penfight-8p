@@ -40,18 +40,16 @@ export function createScene() {
   return scene;
 }
 
-export function createCamera(renderer) {
+export function createCamera(renderer, scale = 1.0) {
   const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 50);
 
-  // Camera positioned to see the full desk with margin on all sides
+  // Camera positioned to see the full desk with margin — scales with board size
   if (aspect < 1) {
-    // Portrait — higher up, further back
-    camera.position.set(0, 0.6, 0.55);
+    camera.position.set(0, 0.6 * scale, 0.55 * scale);
     camera.lookAt(0, 0, 0);
   } else {
-    // Landscape — higher and further back so bottom edge is visible
-    camera.position.set(0, 0.5, 0.45);
+    camera.position.set(0, 0.5 * scale, 0.45 * scale);
     camera.lookAt(0, 0, 0);
   }
   return camera;
