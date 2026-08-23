@@ -312,6 +312,32 @@ class PenFightGame {
     this.turnStartTime = performance.now();
     this.turnWarned = false;
     this._gameLoop(performance.now());
+
+    // Show landscape warning on mobile portrait
+    this._checkLandscapeWarning();
+    window.addEventListener('resize', () => this._checkLandscapeWarning());
+  }
+
+  _checkLandscapeWarning() {
+    const warning = document.getElementById('landscape-warning');
+    if (!warning) return;
+    const isMobile = window.innerWidth < 900;
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const dismissed = this._landscapeWarningDismissed;
+
+    if (isMobile && isPortrait && !dismissed) {
+      warning.classList.remove('hidden');
+      const btn = document.getElementById('landscape-warning-dismiss');
+      if (btn && !btn._bound) {
+        btn._bound = true;
+        btn.addEventListener('click', () => {
+          warning.classList.add('hidden');
+          this._landscapeWarningDismissed = true;
+        });
+      }
+    } else {
+      warning.classList.add('hidden');
+    }
   }
 
   _canFlick() {
