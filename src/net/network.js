@@ -47,6 +47,7 @@ export class NetworkManager {
     this.onReaction = null;
     this.onSpectateStart = null;
     this.onSpectatorUpdate = null;
+    this.onGameRejoin = null;
     this.onError = null;
     this.onConnected = null;
     this.onDisconnected = null;
@@ -309,6 +310,7 @@ export class NetworkManager {
             seat: existing.seat,
             players: this.players,
             roomCode: this.roomCode,
+            gameActive: this.gameStarted,
           });
           this._broadcastRoster();
           // If game is active, send them current state so they resync
@@ -330,6 +332,7 @@ export class NetworkManager {
             seat: sameName.seat,
             players: this.players,
             roomCode: this.roomCode,
+            gameActive: this.gameStarted,
           });
           this._broadcastRoster();
           if (this.gameStarted && this.onSyncRequest) {
@@ -447,6 +450,7 @@ export class NetworkManager {
       case 'welcome':
         this.mySeat = msg.seat;
         this.players = msg.players;
+        this.gameActive = msg.gameActive || false;
         if (this._joinResolve) {
           this._joinResolve(this.roomCode);
           this._joinResolve = null;
@@ -454,6 +458,10 @@ export class NetworkManager {
         this._startKeepAlive();
         if (this.onConnected) this.onConnected();
         if (this.onRosterUpdate) this.onRosterUpdate(this.players);
+        // If game is already active, trigger game start for this rejoining player
+        if (this.gameActive && this.onGameRejoin) {
+          this.onGameRejoin();
+        }
         break;
 
       case 'roster':

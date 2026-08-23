@@ -180,6 +180,20 @@ class PenFightGame {
       }
     };
 
+    this.network.onGameRejoin = () => {
+      // We reconnected to an active game — start game rendering
+      // The host will send a sync shortly with correct state
+      if (!this.playing) {
+        this.mySeat = this.network.mySeat;
+        this.players = this.network.players;
+        const totalPlayers = this.players.length;
+        // Create a temporary state — will be overwritten by sync
+        const tempState = { totalPlayers, phase: 'aiming', scores: new Array(totalPlayers).fill(0), outs: [], activeSeat: 0, opener: 0, round: 1, turn: 0, roundWinners: [], winner: null, revision: 0 };
+        this._startGame(tempState);
+        this.hud.notify('Reconnected! Syncing...', 2000);
+      }
+    };
+
     this.network.onPlayerLeft = (seat) => {
       if (this.playing) {
         const player = this.players.find(p => p.seat === seat);
