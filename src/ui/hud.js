@@ -1,6 +1,6 @@
 import { PLAYER_COLORS } from '../config.js';
 
-const REACTION_EMOJIS = ['😂', '🔥', '💀', '👏', '😤', '😢'];
+const REACTION_EMOJIS = ['😂', '🔥', '💀', '👏', '😤', '😭'];
 
 /**
  * In-game HUD: scoreboard, turn indicator, results, notifications, reactions.
