@@ -6,6 +6,7 @@ import { NetworkManager } from './net/network.js';
 import { LobbyUI } from './ui/lobby.js';
 import { HUD } from './ui/hud.js';
 import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, TURN, getPenStartPosition } from './config.js';
+import { unlockAudio, playFlick, playCollision, playPenOut, playRoundWin, playMatchWin, playTurnNotify } from './audio/sfx.js';
 
 class PenFightGame {
   constructor() {
@@ -42,6 +43,9 @@ class PenFightGame {
   async init() {
     // Init physics WASM
     await initPhysics();
+
+    // Unlock audio on first interaction
+    unlockAudio();
 
     // Show lobby menu
     this.lobbyUI.showMenu();
@@ -486,6 +490,9 @@ class PenFightGame {
   _onFlick(flickData) {
     if (!this.gameState.canShoot(this.mySeat)) return;
 
+    // Play flick sound
+    playFlick(flickData.power);
+
     // Apply locally
     this.gameState.beginShot(this.mySeat);
     this._applyImpulse(flickData);
@@ -504,6 +511,7 @@ class PenFightGame {
 
   _applyShot(msg) {
     if (!this.gameState) return;
+    playFlick(msg.power);
     this.gameState.beginShot(msg.seat);
     this._applyImpulse(msg);
     this.settleFrames = 0;
@@ -584,6 +592,7 @@ class PenFightGame {
 
     // Notify outs
     if (newOuts.length > 0) {
+      playPenOut();
       const names = newOuts.map(s => {
         const p = this.players.find(pl => pl.seat === s);
         return s === this.mySeat ? 'You' : (p ? p.name : 'someone');
@@ -593,6 +602,7 @@ class PenFightGame {
 
     // Handle result
     if (result.kind === 'match_won') {
+      playMatchWin();
       const winner = this.players.find(p => p.seat === result.winner);
       this.hud.showMatchEnd(
         winner ? winner.name : 'someone',
@@ -603,6 +613,7 @@ class PenFightGame {
         () => this._onLeave()
       );
     } else if (result.kind === 'round_won' || result.kind === 'round_tied') {
+      playRoundWin();
       const text = result.kind === 'round_tied'
         ? `Round ${this.gameState.round} draw · ${this.gameState.scores.join('-')}`
         : `${this._seatName(result.winner)} wins round ${this.gameState.round}!`;
@@ -904,11 +915,19 @@ class PenFightGame {
 
     if (this.gameState.phase === 'aiming' && this.gameState.activeSeat !== null) {
       const isMyTurn = this.gameState.activeSeat === this.mySeat;
+      // Play ding only when turn first becomes ours
+      if (isMyTurn && !this._turnDingPlayed) {
+        this._turnDingPlayed = true;
+        playTurnNotify();
+      } else if (!isMyTurn) {
+        this._turnDingPlayed = false;
+      }
       const color = PLAYER_COLORS[this.gameState.activeSeat];
       const name = this._seatName(this.gameState.activeSeat);
       const text = isMyTurn ? 'Your turn — flick!' : `${name}'s turn`;
       this.hud.setTurn(`${color.label} · ${text}`, isMyTurn, isMyTurn ? '✎' : '·');
     } else if (this.gameState.phase === 'settling') {
+      this._turnDingPlayed = false;
       this.hud.setTurn('settling...', false, '↻');
     } else {
       this.hud.clearTurn();
@@ -972,6 +991,20 @@ class PenFightGame {
       syncPenMesh(this.penMeshes[i], this.penBodies[i]);
       // Hide pens that are out OR have fallen off the desk edge
       this.penMeshes[i].visible = !this.gameState.outs.has(i) && isPenOnDesk(this.penBodies[i]);
+    }
+
+    // Detect pen collisions (velocity spike) and play sound
+    for (let i = 0; i < this.penBodies.length; i++) {
+      if (this.gameState.outs.has(i)) continue;
+      const lv = this.penBodies[i].linvel();
+      const speed = Math.sqrt(lv.x * lv.x + lv.z * lv.z);
+      const prev = this._prevSpeeds ? this._prevSpeeds[i] : 0;
+      // If speed increased sharply (something hit it), play collision
+      if (speed - prev > 0.03 && prev < 0.01) {
+        playCollision(Math.min((speed - prev) * 10, 1));
+      }
+      if (!this._prevSpeeds) this._prevSpeeds = new Array(this.penBodies.length).fill(0);
+      this._prevSpeeds[i] = speed;
     }
 
     // Freeze pens that have gone off desk (stop them sliding forever)
