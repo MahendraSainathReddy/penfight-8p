@@ -27,6 +27,21 @@ export class LobbyUI {
   _showJoinView(roomCode) {
     const savedName = localStorage.getItem('pf8_name') || '';
 
+    // Check if another tab is already in this room
+    const activeRoom = localStorage.getItem('pf8_active_room');
+    if (activeRoom === roomCode.toLowerCase().trim()) {
+      this.container.innerHTML = `
+        <div class="lobby-card">
+          <h1 class="logo">PEN FIGHT</h1>
+          <p class="lobby-error">You're already in this room in another tab!</p>
+          <p class="subtitle">Close the other tab first, or use a different name.</p>
+          <button class="btn btn-primary" onclick="localStorage.removeItem('pf8_active_room'); location.reload()">Join Anyway</button>
+          <button class="btn btn-secondary" style="margin-top:0.5rem" onclick="window.close()">Close</button>
+        </div>
+      `;
+      return;
+    }
+
     this.container.innerHTML = `
       <div class="lobby-card">
         <h1 class="logo">PEN FIGHT</h1>
@@ -48,6 +63,8 @@ export class LobbyUI {
       joining = true;
       document.getElementById('btn-join').disabled = true;
       document.getElementById('btn-join').textContent = 'Joining...';
+      // Mark this room as active in this browser
+      localStorage.setItem('pf8_active_room', roomCode.toLowerCase().trim());
       if (this.onJoinRoom) this.onJoinRoom(roomCode.toLowerCase().trim(), name);
     });
 

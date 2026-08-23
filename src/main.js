@@ -54,6 +54,7 @@ class PenFightGame {
       this.lobbyUI.showConnecting('creating room...');
       try {
         const code = await this.network.createRoom(name);
+        localStorage.setItem('pf8_active_room', code);
         this.mySeat = 0;
         this.players = this.network.players;
         this.lobbyUI.showLobby(code, this.players, true, this.mySeat);
@@ -320,6 +321,7 @@ class PenFightGame {
 
     // Send leave message when tab is closed
     window.addEventListener('beforeunload', () => {
+      localStorage.removeItem('pf8_active_room');
       this.network.destroy();
     });
 
@@ -667,6 +669,7 @@ class PenFightGame {
   }
 
   _onLeave() {
+    localStorage.removeItem('pf8_active_room');
     this.network.destroy();
     window.location.href = window.location.pathname;
   }
