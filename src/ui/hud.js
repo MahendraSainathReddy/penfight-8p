@@ -109,6 +109,26 @@ export class HUD {
     this.scoreboard.innerHTML = items;
   }
 
+  setSpectatorBadge(isSpectator, spectatorCount) {
+    if (isSpectator) {
+      this.turnEl.className = 'hud-turn';
+      this.turnEl.innerHTML = '<span class="turn-icon">👁</span> Spectating';
+    }
+    // Show spectator count below scoreboard if there are spectators
+    let badge = document.getElementById('hud-spectator-count');
+    if (spectatorCount > 0) {
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.id = 'hud-spectator-count';
+        badge.className = 'hud-spectator-count';
+        this.scoreboard.parentElement.appendChild(badge);
+      }
+      badge.textContent = `👁 ${spectatorCount} watching`;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
   setTurn(text, isMyTurn, icon = '') {
     this.turnEl.className = `hud-turn ${isMyTurn ? 'my-turn' : ''}`;
     this.turnEl.innerHTML = `${icon ? `<span class="turn-icon">${icon}</span>` : ''}${text}`;

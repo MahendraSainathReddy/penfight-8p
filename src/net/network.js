@@ -45,11 +45,13 @@ export class NetworkManager {
     this.onRematchVote = null;
     this.onSyncRequest = null;
     this.onReaction = null;
+    this.onSpectateStart = null;
     this.onError = null;
     this.onConnected = null;
     this.onDisconnected = null;
 
     this.players = [];
+    this.spectators = []; // { name, peerId, conn }
     this.gameStarted = false;
   }
 
@@ -335,6 +337,24 @@ export class NetworkManager {
 
         // New player — reject if game already started or room full
         if (this.gameStarted) {
+          // Check if they want to spectate
+          if (msg.spectator) {
+            // Accept as spectator
+            const spec = { name: msg.name, peerId: msg.peerId };
+            this.spectators.push(spec);
+            this.connections.set(msg.peerId, conn);
+            this._send(conn, {
+              type: 'spectate_welcome',
+              players: this.players,
+              spectatorCount: this.spectators.length,
+              roomCode: this.roomCode,
+            });
+            // Send them current game state so they can render the board
+            if (this.onSyncRequest) this.onSyncRequest(-1); // -1 signals "send to all"
+            // Notify players that a spectator joined
+            this._broadcast({ type: 'spectator_update', count: this.spectators.length });
+            return;
+          }
           this._send(conn, { type: 'game_in_progress' });
           return;
         }
@@ -470,6 +490,21 @@ export class NetworkManager {
         if (this.onRosterUpdate) this.onRosterUpdate(this.players);
         break;
 
+      case 'spectate_welcome':
+        this.mySeat = -1; // spectator has no seat
+        this.players = msg.players;
+        if (this._joinResolve) {
+          this._joinResolve(this.roomCode);
+          this._joinResolve = null;
+        }
+        this._startKeepAlive();
+        if (this.onSpectateStart) this.onSpectateStart(msg);
+        break;
+
+      case 'spectator_update':
+        // Notification that spectator count changed (informational)
+        break;
+
       case 'full':
         if (this.onError) this.onError('Room is full (8 players max)');
         break;
@@ -561,6 +596,59 @@ export class NetworkManager {
     if (!this.isHost) return;
     const msg = { type: 'sync', state, pens };
     this._broadcast(msg);
+  }
+
+  // Join as spectator (guest-only)
+  async joinAsSpectator(roomCode, name) {
+    this.isHost = false;
+    this.roomCode = roomCode.toLowerCase().trim();
+    this.myName = name;
+    this.isSpectator = true;
+
+    return new Promise((resolve, reject) => {
+      this.peer = new Peer(undefined, {
+        debug: 1,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+          ]
+        }
+      });
+
+      const timeout = setTimeout(() => {
+        this.peer.destroy();
+        reject(new Error('Could not connect to room for spectating.'));
+      }, 10000);
+
+      this.peer.on('open', (id) => {
+        this.myPeerId = id;
+        const hostPeerId = this._getHostPeerId(this.roomCode);
+        const conn = this.peer.connect(hostPeerId, { reliable: true, serialization: 'json' });
+
+        conn.on('open', () => {
+          this.hostConnection = conn;
+          this._send(conn, { type: 'join', name, peerId: id, spectator: true });
+          this._setupGuestListeners(conn);
+        });
+
+        conn.on('error', () => {
+          clearTimeout(timeout);
+          reject(new Error('Could not connect to room.'));
+        });
+      });
+
+      this.peer.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(new Error(`Connection error: ${err.type}`));
+      });
+
+      this._joinResolve = () => {
+        clearTimeout(timeout);
+        resolve(this.roomCode);
+      };
+    });
   }
 
   getInviteLink() {

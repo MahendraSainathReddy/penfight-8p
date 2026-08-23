@@ -88,6 +88,15 @@ class PenFightGame {
     this.lobbyUI.onStartGame = () => {
       this._hostStartGame();
     };
+
+    this.lobbyUI.onSpectate = async (code, name) => {
+      try {
+        await this.network.joinAsSpectator(code, name);
+        // spectate_welcome will trigger onSpectateStart
+      } catch (err) {
+        this.lobbyUI.showError(err.message);
+      }
+    };
   }
 
   _setupNetworkCallbacks() {
@@ -142,6 +151,17 @@ class PenFightGame {
 
     this.network.onReaction = (msg) => {
       this._handleReaction(msg);
+    };
+
+    this.network.onSpectateStart = (msg) => {
+      // We joined as spectator — start game rendering in watch-only mode
+      this.isSpectator = true;
+      this.mySeat = -1;
+      this.players = msg.players;
+      // We'll receive a sync message shortly with full state + pen positions
+      // For now, start with a default state and wait for sync
+      const totalPlayers = msg.players.length;
+      this._startSpectatorMode(totalPlayers);
     };
 
     this.network.onPlayerLeft = (seat) => {
@@ -234,7 +254,14 @@ class PenFightGame {
 
     this.network.onError = (msg) => {
       if (!this.playing) {
-        this.lobbyUI.showError(msg);
+        if (msg === 'Game already started. Wait for the next match.') {
+          // Offer spectate mode
+          const params = new URLSearchParams(window.location.search);
+          const roomCode = params.get('room') || this.network.roomCode;
+          this.lobbyUI.showSpectateOffer(roomCode);
+        } else {
+          this.lobbyUI.showError(msg);
+        }
       }
     };
   }
@@ -345,6 +372,69 @@ class PenFightGame {
     this._checkLandscapeWarning();
   }
 
+  _startSpectatorMode(totalPlayers) {
+    this.playing = true;
+    this.lobbyUI.hide();
+
+    // Init game state (will be overwritten by first sync from host)
+    this.gameState = new GameState(totalPlayers);
+
+    // Setup rendering
+    this.renderer = createRenderer();
+    document.getElementById('game-canvas').appendChild(this.renderer.domElement);
+    this.scene = createScene();
+    this.camera = createCamera(this.renderer);
+    createDeskMesh(this.scene);
+    this.aimLine = createAimLine(this.scene);
+
+    // Setup physics (for visual interpolation on spectator side)
+    this.world = createWorld();
+    createDesk(this.world);
+    createWalls(this.world);
+
+    // Create pens
+    this.penBodies = [];
+    this.penMeshes = [];
+    for (let i = 0; i < totalPlayers; i++) {
+      const pos = getPenStartPosition(i, totalPlayers);
+      const body = createPen(this.world, pos.x, pos.z, pos.yaw);
+      this.penBodies.push(body);
+      const mesh = createPenMesh(this.scene, i);
+      this.penMeshes.push(mesh);
+    }
+
+    // Setup input (spectator can't flick but might want reactions)
+    this.flickInput = new FlickInput(
+      this.renderer,
+      this.camera,
+      () => {}, // no-op flick
+      () => null, // can never flick
+      () => {} // no-op aim
+    );
+    this.flickInput.setPenBodies(this.penBodies);
+
+    // Setup HUD (spectator mode)
+    this.hud = new HUD(document.getElementById('hud'), (emoji) => this._onReaction(emoji));
+    this.hud.notify('Spectating...', 4000);
+    this._updateHUD();
+
+    // Handle resize (only bind once)
+    if (!this._resizeBound) {
+      this._resizeBound = true;
+      window.addEventListener('resize', () => {
+        this._onResize();
+        this._checkLandscapeWarning();
+      });
+    }
+
+    // Start game loop
+    this.lastTime = performance.now();
+    this.accumulator = 0;
+    this.settleFrames = 0;
+    this._gameLoop(performance.now());
+    this._checkLandscapeWarning();
+  }
+
   _checkLandscapeWarning() {
     const warning = document.getElementById('landscape-warning');
     if (!warning) return;
@@ -368,6 +458,7 @@ class PenFightGame {
   }
 
   _canFlick() {
+    if (this.isSpectator) return null;
     if (!this.gameState) return null;
     if (this.gameState.canShoot(this.mySeat)) return this.mySeat;
     return null;
@@ -786,6 +877,11 @@ class PenFightGame {
     if (!this.hud || !this.gameState) return;
 
     this.hud.updateScoreboard(this.players, this.gameState.scores, this.gameState.outs, this.mySeat);
+
+    if (this.isSpectator) {
+      this.hud.setSpectatorBadge(true, 0);
+      return;
+    }
 
     if (this.gameState.phase === 'aiming' && this.gameState.activeSeat !== null) {
       const isMyTurn = this.gameState.activeSeat === this.mySeat;

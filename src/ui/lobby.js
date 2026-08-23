@@ -9,6 +9,7 @@ export class LobbyUI {
     this.onCreateRoom = null;
     this.onJoinRoom = null;
     this.onStartGame = null;
+    this.onSpectate = null;
   }
 
   showMenu() {
@@ -262,6 +263,30 @@ export class LobbyUI {
         <button class="btn btn-primary" onclick="location.reload()">Try Again</button>
       </div>
     `;
+  }
+
+  showSpectateOffer(roomCode) {
+    const savedName = localStorage.getItem('pf8_name') || 'Spectator';
+    this.container.innerHTML = `
+      <div class="lobby-card">
+        <h1 class="logo">PEN FIGHT</h1>
+        <p class="subtitle">Game in progress!</p>
+        <p class="eyebrow">ROOM: <b>${roomCode.toUpperCase()}</b></p>
+        <div class="menu-section">
+          <input type="text" id="spectator-name" placeholder="your name" maxlength="12" class="input-field" value="${escapeHtml(savedName)}" />
+        </div>
+        <button id="btn-spectate" class="btn btn-primary">Watch Game</button>
+        <button class="btn btn-secondary" style="margin-top:0.5rem" onclick="location.reload()">Back</button>
+      </div>
+    `;
+
+    document.getElementById('btn-spectate').addEventListener('click', () => {
+      const name = document.getElementById('spectator-name').value.trim().slice(0, 12) || 'Spectator';
+      localStorage.setItem('pf8_name', name);
+      document.getElementById('btn-spectate').disabled = true;
+      document.getElementById('btn-spectate').textContent = 'Connecting...';
+      if (this.onSpectate) this.onSpectate(roomCode, name);
+    });
   }
 
   hide() {

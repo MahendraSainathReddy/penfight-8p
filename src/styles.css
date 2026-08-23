@@ -672,3 +672,19 @@ html, body {
   margin-top: 1.2rem;
   pointer-events: auto;
 }
+
+/* === Spectator Badge === */
+.hud-spectator-count {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  color: #aaa;
+  pointer-events: none;
+  z-index: 10;
+}
