@@ -16,9 +16,9 @@ export const PEN = {
   halfLength: 0.038,   // shorter pens — less dominant on board
   mass: 0.012,
   friction: 0.9,       // good grip between pens
-  restitution: 0.25,   // slightly bouncier collisions
-  linearDamping: 5.2,  // high drag — pens stop quickly
-  angularDamping: 5.5, // spin dies fast
+  restitution: 0.2,    // moderate bounce on collision
+  linearDamping: 6.0,  // high drag — stops skating after collisions
+  angularDamping: 6.0, // spin dies fast
   selectionRadius: 0.05,
 };
 
