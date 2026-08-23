@@ -124,14 +124,43 @@ export function playCollision(intensity = 0.5) {
  * "Fahhh" sound when a pen falls off the desk — plays the actual audio clip.
  */
 import fahhhSrc from './fahhh.mp3';
-const fahhhAudio = new Audio(fahhhSrc);
-fahhhAudio.volume = 0.5;
+
+let fahhhBuffer = null;
+
+// Pre-load and decode the audio file into a buffer
+async function loadFahhh() {
+  try {
+    const ac = getCtx();
+    const response = await fetch(fahhhSrc);
+    const arrayBuffer = await response.arrayBuffer();
+    fahhhBuffer = await ac.decodeAudioData(arrayBuffer);
+  } catch (e) {
+    console.warn('Could not load fahhh sound:', e);
+  }
+}
 
 export function playPenOut() {
-  // Clone and play so multiple can overlap
-  const sound = fahhhAudio.cloneNode();
-  sound.volume = 0.5;
-  sound.play().catch(() => {}); // Ignore autoplay errors
+  const ac = getCtx();
+
+  // Load buffer on first play if not loaded yet
+  if (!fahhhBuffer) {
+    loadFahhh().then(() => {
+      if (fahhhBuffer) _playBuffer(ac, fahhhBuffer);
+    });
+    return;
+  }
+
+  _playBuffer(ac, fahhhBuffer);
+}
+
+function _playBuffer(ac, buffer) {
+  const source = ac.createBufferSource();
+  source.buffer = buffer;
+  const gain = ac.createGain();
+  gain.gain.value = 0.5;
+  source.connect(gain);
+  gain.connect(ac.destination);
+  source.start(0);
 }
 
 /**

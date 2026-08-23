@@ -682,6 +682,7 @@ class PenFightGame {
         () => this._onLeave()
       );
     } else if (msg.newOuts && msg.newOuts.length > 0) {
+      playPenOut();
       const names = msg.newOuts.map(s => this._seatName(s));
       this.hud.notify(`${names.join(' & ')} knocked out!`);
 
