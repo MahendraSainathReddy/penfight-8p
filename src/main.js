@@ -666,6 +666,7 @@ class PenFightGame {
     }
 
     if (msg.state.phase === 'match_end') {
+      playMatchWin();
       const winner = this.players.find(p => p.seat === msg.state.winner);
       this.hud.showMatchEnd(
         winner ? winner.name : 'someone',
@@ -676,8 +677,14 @@ class PenFightGame {
         () => this._onLeave()
       );
     } else if (msg.newOuts && msg.newOuts.length > 0) {
+      playPenOut();
       const names = msg.newOuts.map(s => this._seatName(s));
       this.hud.notify(`${names.join(' & ')} knocked out!`);
+
+      // Play round win if the state indicates round ended
+      if (msg.state.phase === 'round_result') {
+        playRoundWin();
+      }
     }
 
     this.turnStartTime = performance.now();
@@ -1034,9 +1041,9 @@ class PenFightGame {
       this._checkSettle();
       this._checkTurnTimeout();
 
-      // Periodic sync during settling to keep clients aligned
+      // Periodic sync during settling to keep clients aligned (every 150ms for smooth motion)
       if (this.gameState && this.gameState.phase === 'settling') {
-        if (!this._lastSyncTime || time - this._lastSyncTime > 500) {
+        if (!this._lastSyncTime || time - this._lastSyncTime > 150) {
           this._lastSyncTime = time;
           this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
         }
