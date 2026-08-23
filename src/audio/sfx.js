@@ -106,26 +106,48 @@ export function playCollision(intensity = 0.5) {
 }
 
 /**
- * Thud when a pen falls off the desk.
+ * "Fahhhh" sad trombone / fail sound when a pen falls off the desk.
  */
 export function playPenOut() {
   const ac = getCtx();
   const now = ac.currentTime;
-  const duration = 0.25;
 
-  const osc = ac.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(150, now);
-  osc.frequency.exponentialRampToValueAtTime(40, now + duration);
+  // Descending "wah wah wah wahhh" — sad trombone style
+  const notes = [
+    { freq: 350, start: 0, dur: 0.18 },
+    { freq: 330, start: 0.2, dur: 0.18 },
+    { freq: 310, start: 0.4, dur: 0.18 },
+    { freq: 220, start: 0.6, dur: 0.5 },
+  ];
 
-  const gain = ac.createGain();
-  gain.gain.setValueAtTime(0.3, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  notes.forEach(({ freq, start, dur }) => {
+    const osc = ac.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, now + start);
+    // Add vibrato on the last note for the "wahhh" effect
+    if (start === 0.6) {
+      osc.frequency.setValueAtTime(freq, now + start);
+      osc.frequency.linearRampToValueAtTime(freq * 0.85, now + start + dur);
+    }
 
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + duration);
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0, now + start);
+    gain.gain.linearRampToValueAtTime(0.15, now + start + 0.02);
+    gain.gain.setValueAtTime(0.15, now + start + dur - 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+
+    // Low-pass filter to make it sound muffled/brassy
+    const filter = ac.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 1200;
+    filter.Q.value = 2;
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ac.destination);
+    osc.start(now + start);
+    osc.stop(now + start + dur);
+  });
 }
 
 /**
