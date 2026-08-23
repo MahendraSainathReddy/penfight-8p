@@ -612,7 +612,6 @@ class PenFightGame {
 
     // Notify outs
     if (newOuts.length > 0) {
-      playPenOut();
       const names = newOuts.map(s => {
         const p = this.players.find(pl => pl.seat === s);
         return s === this.mySeat ? 'You' : (p ? p.name : 'someone');
@@ -683,7 +682,6 @@ class PenFightGame {
         () => this._onLeave()
       );
     } else if (msg.newOuts && msg.newOuts.length > 0) {
-      playPenOut();
       const names = msg.newOuts.map(s => this._seatName(s));
       this.hud.notify(`${names.join(' & ')} knocked out!`);
 
@@ -762,6 +760,7 @@ class PenFightGame {
       });
     }
 
+    this._penOutSounded = null; // Reset for new round
     this.hud.hideResult();
     this.turnStartTime = performance.now();
     this.turnWarned = false;
@@ -872,6 +871,7 @@ class PenFightGame {
     const deskScale = getDeskScale(stateData.totalPlayers);
     setDeskScale(deskScale);
     this._currentDeskScale = deskScale;
+    this._penOutSounded = null; // Reset sound tracker for new match
 
     // Reset pen positions
     this._restartGameState();
@@ -1085,10 +1085,17 @@ class PenFightGame {
     }
 
     // Freeze pens that have gone off desk (stop them sliding forever)
+    // Play fahhh sound immediately when a pen crosses the edge
     for (let i = 0; i < this.penBodies.length; i++) {
       if (!isPenOnDesk(this.penBodies[i]) && !this.gameState.outs.has(i)) {
         this.penBodies[i].setLinvel({ x: 0, y: 0, z: 0 }, true);
         this.penBodies[i].setAngvel({ x: 0, y: 0, z: 0 }, true);
+        // Play sound once per pen going off
+        if (!this._penOutSounded) this._penOutSounded = new Set();
+        if (!this._penOutSounded.has(i)) {
+          this._penOutSounded.add(i);
+          playPenOut();
+        }
       }
     }
 
