@@ -121,44 +121,17 @@ export function playCollision(intensity = 0.5) {
 }
 
 /**
- * Sad trombone "wah wah wah wahhh" when a pen falls off the desk.
+ * "Fahhh" sound when a pen falls off the desk — plays the actual audio clip.
  */
+import fahhhSrc from './fahhh.mp3';
+const fahhhAudio = new Audio(fahhhSrc);
+fahhhAudio.volume = 0.5;
+
 export function playPenOut() {
-  const ac = getCtx();
-  const now = ac.currentTime;
-
-  const notes = [
-    { freq: 350, start: 0, dur: 0.18 },
-    { freq: 330, start: 0.2, dur: 0.18 },
-    { freq: 310, start: 0.4, dur: 0.18 },
-    { freq: 220, start: 0.6, dur: 0.5 },
-  ];
-
-  notes.forEach(({ freq, start, dur }) => {
-    const osc = ac.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(freq, now + start);
-    if (start === 0.6) {
-      osc.frequency.linearRampToValueAtTime(freq * 0.85, now + start + dur);
-    }
-
-    const gain = ac.createGain();
-    gain.gain.setValueAtTime(0, now + start);
-    gain.gain.linearRampToValueAtTime(0.15, now + start + 0.02);
-    gain.gain.setValueAtTime(0.15, now + start + dur - 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-
-    const filter = ac.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 1200;
-    filter.Q.value = 2;
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(ac.destination);
-    osc.start(now + start);
-    osc.stop(now + start + dur);
-  });
+  // Clone and play so multiple can overlap
+  const sound = fahhhAudio.cloneNode();
+  sound.volume = 0.5;
+  sound.play().catch(() => {}); // Ignore autoplay errors
 }
 
 /**
