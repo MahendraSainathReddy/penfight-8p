@@ -1,7 +1,7 @@
 // Game configuration constants
 
 export const MAX_PLAYERS = 8;
-export const WIN_SCORE = 5; // First to 5 round wins
+export const WIN_SCORE = 3; // First to 3 round wins
 
 export const DESK = {
   width: 0.50,   // meters — larger board for better gameplay
