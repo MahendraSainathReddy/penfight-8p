@@ -55,6 +55,8 @@ class PenFightGame {
       try {
         const code = await this.network.createRoom(name);
         localStorage.setItem('pf8_active_room', code);
+        // Update URL so host can reload and rejoin
+        window.history.replaceState(null, '', `${window.location.pathname}?room=${code}`);
         this.mySeat = 0;
         this.players = this.network.players;
         this.lobbyUI.showLobby(code, this.players, true, this.mySeat);
