@@ -443,6 +443,13 @@ class PenFightGame {
     this.settleFrames = 0;
     this._gameLoop(performance.now());
     this._checkLandscapeWarning();
+
+    // Request a sync from host after we're fully set up
+    setTimeout(() => {
+      if (this.network.hostConnection) {
+        this.network._send(this.network.hostConnection, { type: 'request_sync', seat: -1 });
+      }
+    }, 500);
   }
 
   _checkLandscapeWarning() {
