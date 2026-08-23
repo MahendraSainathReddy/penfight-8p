@@ -164,6 +164,16 @@ class PenFightGame {
       this._startSpectatorMode(totalPlayers);
     };
 
+    this.network.onSpectatorUpdate = (msg) => {
+      // A spectator joined/left — show notification
+      if (this.hud && msg.names) {
+        this.hud.setSpectatorBadge(this.isSpectator, msg.count);
+        if (!this.isSpectator) {
+          this.hud.notify(`${msg.names[msg.names.length - 1]} is watching`, 2000);
+        }
+      }
+    };
+
     this.network.onPlayerLeft = (seat) => {
       if (this.playing) {
         const player = this.players.find(p => p.seat === seat);

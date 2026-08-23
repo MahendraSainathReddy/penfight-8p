@@ -46,6 +46,7 @@ export class NetworkManager {
     this.onSyncRequest = null;
     this.onReaction = null;
     this.onSpectateStart = null;
+    this.onSpectatorUpdate = null;
     this.onError = null;
     this.onConnected = null;
     this.onDisconnected = null;
@@ -302,6 +303,7 @@ export class NetworkManager {
         if (existing) {
           existing.connected = true;
           this.connections.set(msg.peerId, conn);
+          if (this._lastPong) this._lastPong.set(msg.peerId, Date.now());
           this._send(conn, {
             type: 'welcome',
             seat: existing.seat,
@@ -322,6 +324,7 @@ export class NetworkManager {
           sameName.peerId = msg.peerId;
           sameName.connected = true;
           this.connections.set(msg.peerId, conn);
+          if (this._lastPong) this._lastPong.set(msg.peerId, Date.now());
           this._send(conn, {
             type: 'welcome',
             seat: sameName.seat,
@@ -343,6 +346,7 @@ export class NetworkManager {
             const spec = { name: msg.name, peerId: msg.peerId };
             this.spectators.push(spec);
             this.connections.set(msg.peerId, conn);
+            if (this._lastPong) this._lastPong.set(msg.peerId, Date.now());
             this._send(conn, {
               type: 'spectate_welcome',
               players: this.players,
@@ -352,7 +356,8 @@ export class NetworkManager {
             // Send them current game state so they can render the board
             if (this.onSyncRequest) this.onSyncRequest(-1); // -1 signals "send to all"
             // Notify players that a spectator joined
-            this._broadcast({ type: 'spectator_update', count: this.spectators.length });
+            const specNames = this.spectators.map(s => s.name);
+            this._broadcast({ type: 'spectator_update', count: this.spectators.length, names: specNames });
             return;
           }
           this._send(conn, { type: 'game_in_progress' });
@@ -372,6 +377,7 @@ export class NetworkManager {
         };
         this.players.push(player);
         this.connections.set(msg.peerId, conn);
+        if (this._lastPong) this._lastPong.set(msg.peerId, Date.now());
 
         // Send welcome to joiner
         this._send(conn, {
@@ -401,7 +407,10 @@ export class NetworkManager {
       }
 
       case 'pong': {
-        // Client is alive — update last seen (connection healthy, no action needed)
+        // Client is alive — record last seen time
+        if (this._lastPong) {
+          this._lastPong.set(conn.peer, Date.now());
+        }
         break;
       }
 
@@ -502,7 +511,8 @@ export class NetworkManager {
         break;
 
       case 'spectator_update':
-        // Notification that spectator count changed (informational)
+        // Show spectator info
+        if (this.onSpectatorUpdate) this.onSpectatorUpdate(msg);
         break;
 
       case 'full':
@@ -518,9 +528,11 @@ export class NetworkManager {
   _handleDisconnect(peerId) {
     const player = this.players.find(p => p.peerId === peerId);
     if (!player) return;
+    if (!player.connected) return; // Already disconnected — don't fire twice
 
     player.connected = false;
     this.connections.delete(peerId);
+    if (this._lastPong) this._lastPong.delete(peerId);
 
     if (this.isHost) {
       this._broadcast({ type: 'player_left', seat: player.seat, players: this.players });
@@ -670,11 +682,26 @@ export class NetworkManager {
   }
 
   // Keepalive: host pings all clients every 8s, clients respond with pong.
+  // Host force-disconnects clients that haven't responded in 20s.
   _startKeepAlive() {
+    this._lastPong = new Map(); // peerId -> timestamp
+
     this._keepAliveInterval = setInterval(() => {
       if (this.isHost) {
         // Host pings all clients
         this._broadcast({ type: 'ping', t: Date.now() });
+
+        // Check for dead connections (no pong in 20s)
+        const now = Date.now();
+        for (const [peerId, conn] of this.connections) {
+          const lastSeen = this._lastPong.get(peerId) || now;
+          if (now - lastSeen > 20000) {
+            // Player hasn't responded — force disconnect
+            console.warn('Force disconnecting unresponsive player:', peerId);
+            this._lastPong.delete(peerId);
+            this._handleDisconnect(peerId);
+          }
+        }
       } else if (this.hostConnection) {
         // Guest sends pong to host
         this._send(this.hostConnection, { type: 'pong', seat: this.mySeat, t: Date.now() });
