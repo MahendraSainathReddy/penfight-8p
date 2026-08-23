@@ -159,30 +159,43 @@ class PenFightGame {
           }
         }
 
-        // Check if only 1 player remains — they win
+        // Check if only 1 player remains — they win the round
+        // Only host modifies scores — guests receive updates via sync
         const alive = this.gameState.getActivePlayers();
-        if (alive.length <= 1) {
+        if (alive.length <= 1 && this.gameState.phase !== 'match_end' && this.network.isHost) {
           const winner = alive.length === 1 ? alive[0] : null;
           if (winner !== null) {
             this.gameState.scores[winner]++;
-            this.gameState.winner = winner;
-            this.gameState.phase = 'match_end';
             this.gameState.revision++;
-            const winnerPlayer = this.players.find(p => p.seat === winner);
-            this.hud.showMatchEnd(
-              winnerPlayer ? winnerPlayer.name : 'someone',
-              this.gameState.scores,
-              this.players,
-              this.mySeat,
-              () => this._onRematch(),
-              () => this._onLeave()
-            );
-            // Host broadcasts the result
-            if (this.network.isHost) {
-              this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+
+            // Check if they've won the match
+            if (this.gameState.scores[winner] >= 3) {
+              this.gameState.winner = winner;
+              this.gameState.phase = 'match_end';
+              const winnerPlayer = this.players.find(p => p.seat === winner);
+              this.hud.showMatchEnd(
+                winnerPlayer ? winnerPlayer.name : 'someone',
+                this.gameState.scores,
+                this.players,
+                this.mySeat,
+                () => this._onRematch(),
+                () => this._onLeave()
+              );
+            } else {
+              // Just a round win — advance to next round
+              this.gameState.phase = 'round_result';
+              this.hud.notify(`${this._seatName(winner)} wins the round! (player left)`);
+              setTimeout(() => {
+                if (this.gameState.phase === 'round_result') {
+                  this._advanceRound();
+                }
+              }, 3000);
             }
+
+            // Host broadcasts the result to all
+            this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
           }
-        } else {
+        } else if (alive.length >= 2) {
           // If the disconnected player was the active shooter, advance turn
           if (this.gameState.phase === 'aiming' && this.gameState.activeSeat === seat) {
             const next = this.gameState.getNextSeat(seat);
