@@ -971,8 +971,50 @@ class PenFightGame {
   }
 
   _setAllPenStates(pens) {
-    for (let i = 0; i < pens.length && i < this.penBodies.length; i++) {
-      setPenState(this.penBodies[i], pens[i]);
+    if (this.network.isHost) {
+      // Host is authoritative — apply directly
+      for (let i = 0; i < pens.length && i < this.penBodies.length; i++) {
+        setPenState(this.penBodies[i], pens[i]);
+      }
+    } else {
+      // Guest: store target states for smooth interpolation
+      this._syncTargets = pens;
+    }
+  }
+
+  _interpolatePens() {
+    // Smoothly lerp guest pen bodies toward host's authoritative positions
+    if (!this._syncTargets || this.network.isHost) return;
+
+    const lerpFactor = 0.3; // Blend 30% toward target each frame (at 60fps ≈ smooth catch-up)
+
+    for (let i = 0; i < this._syncTargets.length && i < this.penBodies.length; i++) {
+      const target = this._syncTargets[i];
+      if (!target) continue;
+      if (this.gameState && this.gameState.outs.has(i)) continue;
+
+      const body = this.penBodies[i];
+      const pos = body.translation();
+      const tPos = { x: target.p[0], y: target.p[1], z: target.p[2] };
+
+      // Lerp position
+      const newX = pos.x + (tPos.x - pos.x) * lerpFactor;
+      const newZ = pos.z + (tPos.z - pos.z) * lerpFactor;
+      body.setTranslation({ x: newX, y: tPos.y, z: newZ }, true);
+
+      // Slerp rotation (for Y-only rotation, lerp the quaternion)
+      const rot = body.rotation();
+      const tRot = { x: target.q[0], y: target.q[1], z: target.q[2], w: target.q[3] };
+      body.setRotation({
+        x: 0,
+        y: rot.y + (tRot.y - rot.y) * lerpFactor,
+        z: 0,
+        w: rot.w + (tRot.w - rot.w) * lerpFactor,
+      }, true);
+
+      // Apply target velocity so local physics continues in right direction
+      body.setLinvel({ x: target.lv[0], y: 0, z: target.lv[2] }, true);
+      body.setAngvel({ x: 0, y: target.av[1], z: 0 }, true);
     }
   }
 
@@ -1017,6 +1059,9 @@ class PenFightGame {
       steps++;
     }
     if (steps === SIM.maxSubSteps) this.accumulator = 0;
+
+    // Smooth interpolation for guests toward host's authoritative state
+    this._interpolatePens();
 
     // Sync meshes to physics
     for (let i = 0; i < this.penBodies.length; i++) {
