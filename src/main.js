@@ -1,11 +1,11 @@
-import { initPhysics, createWorld, createDesk, createWalls, createPen, getPenState, setPenState, isPenOnDesk, isPenSettled } from './physics/world.js';
+import { initPhysics, createWorld, createDesk, createWalls, createPen, getPenState, setPenState, isPenOnDesk, isPenSettled, setDeskScale } from './physics/world.js';
 import { createScene, createCamera, createRenderer, createDeskMesh, createPenMesh, syncPenMesh, createAimLine, updateAimLine } from './render/scene.js';
 import { FlickInput } from './input/flick.js';
 import { GameState } from './game/state.js';
 import { NetworkManager } from './net/network.js';
 import { LobbyUI } from './ui/lobby.js';
 import { HUD } from './ui/hud.js';
-import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, TURN, getPenStartPosition } from './config.js';
+import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, TURN, DESK, getDeskScale, getPenStartPosition } from './config.js';
 import { unlockAudio, playFlick, playCollision, playPenOut, playRoundWin, playMatchWin, playTurnNotify } from './audio/sfx.js';
 
 class PenFightGame {
@@ -321,12 +321,14 @@ class PenFightGame {
     document.getElementById('game-canvas').appendChild(this.renderer.domElement);
     this.scene = createScene();
     this.camera = createCamera(this.renderer);
-    createDeskMesh(this.scene);
+    const deskScale = getDeskScale(totalPlayers);
+    setDeskScale(deskScale);
+    createDeskMesh(this.scene, deskScale);
     this.aimLine = createAimLine(this.scene);
 
     // Setup physics
     this.world = createWorld();
-    createDesk(this.world);
+    createDesk(this.world, deskScale);
     createWalls(this.world);
 
     // Create pens
@@ -414,12 +416,14 @@ class PenFightGame {
     document.getElementById('game-canvas').appendChild(this.renderer.domElement);
     this.scene = createScene();
     this.camera = createCamera(this.renderer);
-    createDeskMesh(this.scene);
+    const deskScale = getDeskScale(totalPlayers);
+    setDeskScale(deskScale);
+    createDeskMesh(this.scene, deskScale);
     this.aimLine = createAimLine(this.scene);
 
     // Setup physics (for visual interpolation on spectator side)
     this.world = createWorld();
-    createDesk(this.world);
+    createDesk(this.world, deskScale);
     createWalls(this.world);
 
     // Create pens

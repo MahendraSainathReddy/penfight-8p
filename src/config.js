@@ -4,12 +4,22 @@ export const MAX_PLAYERS = 8;
 export const WIN_SCORE = 3; // First to 3 round wins
 
 export const DESK = {
-  width: 0.50,   // meters — larger board for better gameplay
+  width: 0.50,   // base size — scaled up for more players
   depth: 0.50,
   height: 0.02,
-  friction: 1.1,   // high friction — good grip
+  friction: 1.1,
   restitution: 0.15,
 };
+
+// Returns scaled desk dimensions based on player count
+export function getDeskScale(totalPlayers) {
+  // 2 players: base size, 3-4: slightly bigger, 5+: larger
+  if (totalPlayers <= 2) return 1.0;
+  if (totalPlayers <= 3) return 1.1;
+  if (totalPlayers <= 4) return 1.2;
+  if (totalPlayers <= 5) return 1.3;
+  return 1.35 + (totalPlayers - 6) * 0.05; // 6=1.35, 7=1.40, 8=1.45
+}
 
 export const PEN = {
   radius: 0.004,       // smaller visible pens
@@ -61,32 +71,30 @@ export const PLAYER_COLORS = [
 // For 3: triangle layout like penfight.xyz
 // For 4+: spread around the desk
 export function getPenStartPosition(seatIndex, totalPlayers) {
+  const scale = getDeskScale(totalPlayers);
+  const dw = DESK.width * scale; // scaled desk width
+  const dd = DESK.depth * scale; // scaled desk depth
+
   if (totalPlayers === 2) {
-    // Two players — pens placed with their BODIES (sides) facing each other
-    // yaw = 0 means pen lies along Z axis. We want pen bodies parallel,
-    // so they are side-by-side, not tip-to-tip.
     const positions = [
-      { x: 0, z: -DESK.depth * 0.2, yaw: Math.PI / 2 },   // top pen, body faces down
-      { x: 0, z:  DESK.depth * 0.2, yaw: Math.PI / 2 },   // bottom pen, body faces up
+      { x: 0, z: -dd * 0.2, yaw: Math.PI / 2 },
+      { x: 0, z:  dd * 0.2, yaw: Math.PI / 2 },
     ];
     return positions[seatIndex];
   }
 
   if (totalPlayers === 3) {
-    // Triangle layout — pens oriented so their sides face the center
-    // (perpendicular to the line from pen to center)
     const positions = [
-      { x: -DESK.width * 0.2, z: -DESK.depth * 0.15, yaw: Math.PI * 0.83 },  // top-left, body faces center
-      { x:  DESK.width * 0.2, z: -DESK.depth * 0.15, yaw: Math.PI * 0.17 },  // top-right, body faces center
-      { x: 0,                 z:  DESK.depth * 0.22,  yaw: Math.PI / 2 },     // bottom-center, body faces up
+      { x: -dw * 0.2, z: -dd * 0.15, yaw: Math.PI * 0.83 },
+      { x:  dw * 0.2, z: -dd * 0.15, yaw: Math.PI * 0.17 },
+      { x: 0,         z:  dd * 0.22,  yaw: Math.PI / 2 },
     ];
     return positions[seatIndex];
   }
 
   if (totalPlayers === 4) {
-    // Four corners — pens perpendicular to the diagonal (body faces center)
-    const hw = DESK.width * 0.22;
-    const hd = DESK.depth * 0.22;
+    const hw = dw * 0.22;
+    const hd = dd * 0.22;
     const positions = [
       { x: -hw, z: -hd, yaw:  Math.PI * 0.75 },
       { x:  hw, z: -hd, yaw:  Math.PI * 0.25 },
@@ -96,12 +104,12 @@ export function getPenStartPosition(seatIndex, totalPlayers) {
     return positions[seatIndex];
   }
 
-  // 5-8 players: evenly spaced circle, body (side) faces center
-  const radius = Math.min(DESK.width, DESK.depth) * 0.26;
+  // 5-8 players: evenly spaced circle, wider spread
+  const radius = Math.min(dw, dd) * 0.28;
   const angle = (2 * Math.PI * seatIndex) / totalPlayers - Math.PI / 2;
   return {
     x: Math.cos(angle) * radius,
     z: Math.sin(angle) * radius,
-    yaw: angle + Math.PI, // pen body (side) faces center, not tip
+    yaw: angle + Math.PI,
   };
 }

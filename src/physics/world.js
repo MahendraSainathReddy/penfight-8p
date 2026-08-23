@@ -2,6 +2,9 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { SIM, DESK, PEN, SETTLE } from '../config.js';
 
 let rapier = null;
+let _deskScale = 1.0;
+
+export function setDeskScale(s) { _deskScale = s; }
 
 export async function initPhysics() {
   await RAPIER.init();
@@ -17,15 +20,15 @@ export function createWorld() {
   return world;
 }
 
-export function createDesk(world) {
+export function createDesk(world, scale = 1.0) {
   const bodyDesc = rapier.RigidBodyDesc.fixed()
     .setTranslation(0, -DESK.height / 2, 0);
   const body = world.createRigidBody(bodyDesc);
 
   const colliderDesc = rapier.ColliderDesc.cuboid(
-    DESK.width / 2,
+    (DESK.width * scale) / 2,
     DESK.height / 2,
-    DESK.depth / 2
+    (DESK.depth * scale) / 2
   )
     .setFriction(DESK.friction)
     .setRestitution(DESK.restitution);
@@ -103,8 +106,8 @@ export function setPenState(body, state) {
 
 export function isPenOnDesk(body) {
   const pos = body.translation();
-  const hw = DESK.width / 2 + PEN.halfLength * 0.2;
-  const hd = DESK.depth / 2 + PEN.halfLength * 0.2;
+  const hw = (DESK.width * _deskScale) / 2 + PEN.halfLength * 0.2;
+  const hd = (DESK.depth * _deskScale) / 2 + PEN.halfLength * 0.2;
   // Pen is "out" if its center is beyond the desk edges (+ small margin)
   if (Math.abs(pos.x) > hw) return false;
   if (Math.abs(pos.z) > hd) return false;

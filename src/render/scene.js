@@ -69,9 +69,11 @@ export function createRenderer() {
   return renderer;
 }
 
-export function createDeskMesh(scene) {
+export function createDeskMesh(scene, scale = 1.0) {
   // === Desk top surface ===
-  const deskGeo = new THREE.BoxGeometry(DESK.width, DESK.height, DESK.depth);
+  const w = DESK.width * scale;
+  const d = DESK.depth * scale;
+  const deskGeo = new THREE.BoxGeometry(w, DESK.height, d);
   
   // Create a canvas texture for wood grain
   const woodCanvas = document.createElement('canvas');
@@ -133,10 +135,10 @@ export function createDeskMesh(scene) {
   const borderColor = 0x5c3d2e;
   
   const borders = [
-    { w: DESK.width + borderThickness * 2, h: borderHeight, d: borderThickness, x: 0, z: DESK.depth / 2 + borderThickness / 2 },
-    { w: DESK.width + borderThickness * 2, h: borderHeight, d: borderThickness, x: 0, z: -DESK.depth / 2 - borderThickness / 2 },
-    { w: borderThickness, h: borderHeight, d: DESK.depth, x: DESK.width / 2 + borderThickness / 2, z: 0 },
-    { w: borderThickness, h: borderHeight, d: DESK.depth, x: -DESK.width / 2 - borderThickness / 2, z: 0 },
+    { w: w + borderThickness * 2, h: borderHeight, d: borderThickness, x: 0, z: d / 2 + borderThickness / 2 },
+    { w: w + borderThickness * 2, h: borderHeight, d: borderThickness, x: 0, z: -d / 2 - borderThickness / 2 },
+    { w: borderThickness, h: borderHeight, d: d, x: w / 2 + borderThickness / 2, z: 0 },
+    { w: borderThickness, h: borderHeight, d: d, x: -w / 2 - borderThickness / 2, z: 0 },
   ];
   
   for (const b of borders) {
@@ -152,8 +154,8 @@ export function createDeskMesh(scene) {
   // === Desk legs ===
   const legGeo = new THREE.CylinderGeometry(0.012, 0.014, 0.32, 8);
   const legMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.9, metalness: 0.2 });
-  const legOffsetX = DESK.width / 2 - 0.035;
-  const legOffsetZ = DESK.depth / 2 - 0.035;
+  const legOffsetX = w / 2 - 0.035;
+  const legOffsetZ = d / 2 - 0.035;
   const legY = -DESK.height - 0.16;
   
   const legPositions = [
