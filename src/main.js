@@ -203,28 +203,27 @@ class PenFightGame {
           }
         } else if (alive.length >= 2) {
           // If the disconnected player was the active shooter, advance turn
-          if (this.gameState.phase === 'aiming' && this.gameState.activeSeat === seat) {
-            const next = this.gameState.getNextSeat(seat);
-            if (next !== null) {
-              this.gameState.activeSeat = next;
-              this.gameState.revision++;
-              this.turnStartTime = performance.now();
-              this.turnWarned = false;
-            }
-          }
-          // If settling and active seat was this player, move on
-          if (this.gameState.phase === 'settling' && this.gameState.activeSeat === seat) {
-            this.gameState.phase = 'aiming';
-            const next = this.gameState.getNextSeat(seat);
-            if (next !== null) {
-              this.gameState.activeSeat = next;
-              this.gameState.revision++;
-              this.turnStartTime = performance.now();
-              this.turnWarned = false;
-            }
-          }
-          // Host syncs state to keep everyone aligned
+          // Only host should modify game state — guests will receive sync
           if (this.network.isHost) {
+            if (this.gameState.phase === 'aiming' && this.gameState.activeSeat === seat) {
+              const next = this.gameState.getNextSeat(seat);
+              if (next !== null) {
+                this.gameState.activeSeat = next;
+                this.gameState.revision++;
+                this.turnStartTime = performance.now();
+              }
+            }
+            // If settling and active seat was this player, move on
+            if (this.gameState.phase === 'settling' && this.gameState.activeSeat === seat) {
+              this.gameState.phase = 'aiming';
+              const next = this.gameState.getNextSeat(seat);
+              if (next !== null) {
+                this.gameState.activeSeat = next;
+                this.gameState.revision++;
+                this.turnStartTime = performance.now();
+              }
+            }
+            // Host syncs state to keep everyone aligned
             this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
           }
         }
@@ -316,14 +315,23 @@ class PenFightGame {
     this.hud = new HUD(document.getElementById('hud'), (emoji) => this._onReaction(emoji));
     this._updateHUD();
 
-    // Handle resize
-    window.addEventListener('resize', () => this._onResize());
+    // Handle resize (only bind once)
+    if (!this._resizeBound) {
+      this._resizeBound = true;
+      window.addEventListener('resize', () => {
+        this._onResize();
+        this._checkLandscapeWarning();
+      });
+    }
 
-    // Send leave message when tab is closed
-    window.addEventListener('beforeunload', () => {
-      localStorage.removeItem('pf8_active_room');
-      this.network.destroy();
-    });
+    // Send leave message when tab is closed (only bind once)
+    if (!this._beforeUnloadBound) {
+      this._beforeUnloadBound = true;
+      window.addEventListener('beforeunload', () => {
+        localStorage.removeItem('pf8_active_room');
+        this.network.destroy();
+      });
+    }
 
     // Start game loop
     this.lastTime = performance.now();
@@ -335,7 +343,6 @@ class PenFightGame {
 
     // Show landscape warning on mobile portrait
     this._checkLandscapeWarning();
-    window.addEventListener('resize', () => this._checkLandscapeWarning());
   }
 
   _checkLandscapeWarning() {
@@ -549,15 +556,37 @@ class PenFightGame {
     if (msg.pens) {
       this._setAllPenStates(msg.pens);
     }
+
+    // If we synced into match_end state, show the end screen
+    if (msg.state.phase === 'match_end' && msg.state.winner !== null) {
+      const winner = this.players.find(p => p.seat === msg.state.winner);
+      this.hud.showMatchEnd(
+        winner ? winner.name : 'someone',
+        this.gameState.scores,
+        this.players,
+        this.mySeat,
+        () => this._onRematch(),
+        () => this._onLeave()
+      );
+    }
+
     this._updateHUD();
   }
 
   _advanceRound() {
     if (!this.gameState.nextRound()) return;
 
-    // Reset pen positions
+    // Reset pen positions — but keep disconnected players out
     const totalPlayers = this.gameState.totalPlayers;
     for (let i = 0; i < totalPlayers; i++) {
+      // Check if this player is disconnected — keep them out
+      const player = this.players.find(p => p.seat === i);
+      if (player && player.connected === false) {
+        this.gameState.outs.add(i);
+        if (this.penMeshes[i]) this.penMeshes[i].visible = false;
+        continue;
+      }
+
       const pos = getPenStartPosition(i, totalPlayers);
       const body = this.penBodies[i];
       body.setTranslation({ x: pos.x, y: 0.004, z: pos.z }, true);
@@ -567,6 +596,14 @@ class PenFightGame {
       const cosHalf = Math.cos(pos.yaw / 2);
       const sinHalf = Math.sin(pos.yaw / 2);
       body.setRotation({ x: 0, y: sinHalf, z: 0, w: cosHalf }, true);
+    }
+
+    // Make sure opener is a connected player
+    while (this.gameState.outs.has(this.gameState.activeSeat)) {
+      const next = this.gameState.getNextSeat(this.gameState.activeSeat);
+      if (next === null) break;
+      this.gameState.activeSeat = next;
+      this.gameState.opener = next;
     }
 
     // Host broadcasts
