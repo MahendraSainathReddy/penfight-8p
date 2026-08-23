@@ -34,27 +34,30 @@ export function unlockAudio() {
  */
 export function playFlick(power = 0.5) {
   const ac = getCtx();
-  const duration = 0.15;
+  const duration = 0.2;
   const now = ac.currentTime;
 
-  // Filtered noise burst
+  // Filtered noise sweep — airy whoosh
   const bufferSize = ac.sampleRate * duration;
   const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < bufferSize; i++) {
-    data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
   }
 
   const source = ac.createBufferSource();
   source.buffer = buffer;
 
+  // Sweeping high-pass filter for whoosh effect
   const filter = ac.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.setValueAtTime(2000 + power * 3000, now);
-  filter.Q.value = 1.5;
+  filter.type = 'highpass';
+  filter.frequency.setValueAtTime(500, now);
+  filter.frequency.exponentialRampToValueAtTime(4000 + power * 4000, now + duration * 0.3);
+  filter.frequency.exponentialRampToValueAtTime(800, now + duration);
+  filter.Q.value = 0.7;
 
   const gain = ac.createGain();
-  gain.gain.setValueAtTime(0.3 * power + 0.1, now);
+  gain.gain.setValueAtTime(0.2 + power * 0.2, now);
   gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
   source.connect(filter);
@@ -65,39 +68,41 @@ export function playFlick(power = 0.5) {
 }
 
 /**
- * Clack sound when pens collide.
+ * Hard plastic clack when pens collide.
  */
 export function playCollision(intensity = 0.5) {
   const ac = getCtx();
   const now = ac.currentTime;
-  const duration = 0.08;
 
-  // Short sharp oscillator hit
-  const osc = ac.createOscillator();
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(800 + intensity * 400, now);
-  osc.frequency.exponentialRampToValueAtTime(200, now + duration);
+  // Sharp attack transient — like plastic hitting plastic
+  const osc1 = ac.createOscillator();
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(3000 + intensity * 1500, now);
+  osc1.frequency.exponentialRampToValueAtTime(500, now + 0.05);
 
-  const gain = ac.createGain();
-  gain.gain.setValueAtTime(0.25 * intensity + 0.05, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  const gain1 = ac.createGain();
+  gain1.gain.setValueAtTime(0.3 * intensity + 0.1, now);
+  gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
 
-  osc.connect(gain);
-  gain.connect(ac.destination);
-  osc.start(now);
-  osc.stop(now + duration);
+  osc1.connect(gain1);
+  gain1.connect(ac.destination);
+  osc1.start(now);
+  osc1.stop(now + 0.06);
 
-  // Add a click transient
-  const click = ac.createOscillator();
-  click.type = 'sine';
-  click.frequency.setValueAtTime(1500, now);
-  const clickGain = ac.createGain();
-  clickGain.gain.setValueAtTime(0.15, now);
-  clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
-  click.connect(clickGain);
-  clickGain.connect(ac.destination);
-  click.start(now);
-  click.stop(now + 0.03);
+  // Resonant body — short low "tok"
+  const osc2 = ac.createOscillator();
+  osc2.type = 'triangle';
+  osc2.frequency.setValueAtTime(400 + intensity * 200, now);
+  osc2.frequency.exponentialRampToValueAtTime(150, now + 0.1);
+
+  const gain2 = ac.createGain();
+  gain2.gain.setValueAtTime(0.2 * intensity, now + 0.005);
+  gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+  osc2.connect(gain2);
+  gain2.connect(ac.destination);
+  osc2.start(now);
+  osc2.stop(now + 0.1);
 }
 
 /**
