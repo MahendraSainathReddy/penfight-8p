@@ -9,24 +9,39 @@ function getCtx() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  // Resume if suspended (browsers require user gesture)
   if (ctx.state === 'suspended') {
     ctx.resume();
   }
   return ctx;
 }
 
-// Unlock audio on first user interaction
+// Unlock audio on first user interaction — critical for iOS Safari
 export function unlockAudio() {
   const unlock = () => {
-    getCtx();
-    document.removeEventListener('touchstart', unlock);
-    document.removeEventListener('mousedown', unlock);
-    document.removeEventListener('click', unlock);
+    // Create context inside the gesture if it doesn't exist
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // Resume if suspended
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    // iOS requires playing a silent buffer inside the gesture
+    const silentBuffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = silentBuffer;
+    source.connect(ctx.destination);
+    source.start(0);
+
+    document.removeEventListener('touchstart', unlock, true);
+    document.removeEventListener('touchend', unlock, true);
+    document.removeEventListener('mousedown', unlock, true);
+    document.removeEventListener('click', unlock, true);
   };
-  document.addEventListener('touchstart', unlock, { once: true });
-  document.addEventListener('mousedown', unlock, { once: true });
-  document.addEventListener('click', unlock, { once: true });
+  document.addEventListener('touchstart', unlock, { capture: true, once: false });
+  document.addEventListener('touchend', unlock, { capture: true, once: false });
+  document.addEventListener('mousedown', unlock, { capture: true, once: false });
+  document.addEventListener('click', unlock, { capture: true, once: false });
 }
 
 /**
