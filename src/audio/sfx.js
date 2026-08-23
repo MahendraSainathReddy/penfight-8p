@@ -106,48 +106,59 @@ export function playCollision(intensity = 0.5) {
 }
 
 /**
- * "Fahhhh" sad trombone / fail sound when a pen falls off the desk.
+ * "Fahhh" meme sound — descending vocal fail sound.
+ * Synthesized to approximate the meme using formant-like oscillators.
  */
 export function playPenOut() {
   const ac = getCtx();
   const now = ac.currentTime;
+  const duration = 1.0;
 
-  // Descending "wah wah wah wahhh" — sad trombone style
-  const notes = [
-    { freq: 350, start: 0, dur: 0.18 },
-    { freq: 330, start: 0.2, dur: 0.18 },
-    { freq: 310, start: 0.4, dur: 0.18 },
-    { freq: 220, start: 0.6, dur: 0.5 },
-  ];
+  // Main "ahhh" voice — two oscillators for vocal formant
+  const osc1 = ac.createOscillator();
+  osc1.type = 'sawtooth';
+  osc1.frequency.setValueAtTime(280, now);
+  osc1.frequency.exponentialRampToValueAtTime(120, now + duration);
 
-  notes.forEach(({ freq, start, dur }) => {
-    const osc = ac.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(freq, now + start);
-    // Add vibrato on the last note for the "wahhh" effect
-    if (start === 0.6) {
-      osc.frequency.setValueAtTime(freq, now + start);
-      osc.frequency.linearRampToValueAtTime(freq * 0.85, now + start + dur);
-    }
+  const osc2 = ac.createOscillator();
+  osc2.type = 'sawtooth';
+  osc2.frequency.setValueAtTime(560, now);
+  osc2.frequency.exponentialRampToValueAtTime(240, now + duration);
 
-    const gain = ac.createGain();
-    gain.gain.setValueAtTime(0, now + start);
-    gain.gain.linearRampToValueAtTime(0.15, now + start + 0.02);
-    gain.gain.setValueAtTime(0.15, now + start + dur - 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+  // Formant filters to shape it like a voice saying "ahh"
+  const formant1 = ac.createBiquadFilter();
+  formant1.type = 'bandpass';
+  formant1.frequency.value = 800;
+  formant1.Q.value = 5;
 
-    // Low-pass filter to make it sound muffled/brassy
-    const filter = ac.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 1200;
-    filter.Q.value = 2;
+  const formant2 = ac.createBiquadFilter();
+  formant2.type = 'bandpass';
+  formant2.frequency.value = 1200;
+  formant2.Q.value = 5;
 
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(ac.destination);
-    osc.start(now + start);
-    osc.stop(now + start + dur);
-  });
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.25, now + 0.05);
+  gain.gain.setValueAtTime(0.25, now + 0.3);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+  // Mix both formants
+  const merger = ac.createGain();
+  merger.gain.value = 1;
+
+  osc1.connect(formant1);
+  osc1.connect(formant2);
+  osc2.connect(formant1);
+  osc2.connect(formant2);
+  formant1.connect(merger);
+  formant2.connect(merger);
+  merger.connect(gain);
+  gain.connect(ac.destination);
+
+  osc1.start(now);
+  osc2.start(now);
+  osc1.stop(now + duration);
+  osc2.stop(now + duration);
 }
 
 /**
