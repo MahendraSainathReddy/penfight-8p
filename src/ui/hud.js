@@ -45,31 +45,31 @@ export class HUD {
   _setupLandscapeButton() {
     const btn = document.getElementById('hud-landscape');
     btn.addEventListener('click', async () => {
+      const el = document.documentElement;
+      const requestFS = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      const exitFS = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      const isFS = document.fullscreenElement || document.webkitFullscreenElement;
+
       try {
-        if (screen.orientation && screen.orientation.lock) {
-          const isLandscape = screen.orientation.type.includes('landscape');
-          if (isLandscape) {
-            await screen.orientation.unlock();
-            if (document.fullscreenElement) await document.exitFullscreen();
-          } else {
-            await document.documentElement.requestFullscreen();
-            await screen.orientation.lock('landscape');
+        if (isFS) {
+          // Already fullscreen — exit
+          if (exitFS) await exitFS.call(document);
+          if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
           }
         } else {
-          if (!document.fullscreenElement) {
-            await document.documentElement.requestFullscreen();
-          } else {
-            await document.exitFullscreen();
+          // Enter fullscreen
+          if (requestFS) await requestFS.call(el);
+          // Try to lock orientation to landscape
+          if (screen.orientation && screen.orientation.lock) {
+            try { await screen.orientation.lock('landscape'); } catch (e) { /* not supported */ }
           }
         }
       } catch (e) {
+        // Fallback: just try fullscreen
         try {
-          if (!document.fullscreenElement) {
-            await document.documentElement.requestFullscreen();
-          } else {
-            await document.exitFullscreen();
-          }
-        } catch (e2) { /* not supported */ }
+          if (requestFS && !isFS) await requestFS.call(el);
+        } catch (e2) { /* give up */ }
       }
     });
   }
