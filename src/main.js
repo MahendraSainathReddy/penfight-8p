@@ -165,9 +165,9 @@ class PenFightGame {
     };
 
     this.network.onSpectatorUpdate = (msg) => {
-      // A spectator joined/left — show notification
+      // A spectator joined/left — show notification and badge
       if (this.hud && msg.names) {
-        this.hud.setSpectatorBadge(this.isSpectator, msg.count);
+        this.hud.setSpectatorBadge(this.isSpectator, msg.count, msg.names);
         if (!this.isSpectator) {
           this.hud.notify(`${msg.names[msg.names.length - 1]} is watching`, 2000);
         }

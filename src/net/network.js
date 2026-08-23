@@ -357,7 +357,10 @@ export class NetworkManager {
             if (this.onSyncRequest) this.onSyncRequest(-1); // -1 signals "send to all"
             // Notify players that a spectator joined
             const specNames = this.spectators.map(s => s.name);
-            this._broadcast({ type: 'spectator_update', count: this.spectators.length, names: specNames });
+            const specMsg = { type: 'spectator_update', count: this.spectators.length, names: specNames };
+            this._broadcast(specMsg);
+            // Also notify the host itself
+            if (this.onSpectatorUpdate) this.onSpectatorUpdate(specMsg);
             return;
           }
           this._send(conn, { type: 'game_in_progress' });

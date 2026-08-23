@@ -121,21 +121,23 @@ export class HUD {
     this.scoreboard.innerHTML = items;
   }
 
-  setSpectatorBadge(isSpectator, spectatorCount) {
+  setSpectatorBadge(isSpectator, spectatorCount, spectatorNames) {
     if (isSpectator) {
       this.turnEl.className = 'hud-turn';
       this.turnEl.innerHTML = '<span class="turn-icon">👁</span> Spectating';
     }
-    // Show spectator count below scoreboard if there are spectators
+    // Show spectator info for everyone
     let badge = document.getElementById('hud-spectator-count');
-    if (spectatorCount > 0) {
+    if (spectatorCount > 0 || (spectatorNames && spectatorNames.length > 0)) {
+      const count = spectatorCount || (spectatorNames ? spectatorNames.length : 0);
+      const names = spectatorNames ? spectatorNames.join(', ') : '';
       if (!badge) {
         badge = document.createElement('div');
         badge.id = 'hud-spectator-count';
         badge.className = 'hud-spectator-count';
         this.scoreboard.parentElement.appendChild(badge);
       }
-      badge.textContent = `👁 ${spectatorCount} watching`;
+      badge.textContent = names ? `👁 ${names}` : `👁 ${count} watching`;
     } else if (badge) {
       badge.remove();
     }
