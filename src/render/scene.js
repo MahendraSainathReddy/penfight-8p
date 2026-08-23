@@ -44,15 +44,15 @@ export function createCamera(renderer) {
   const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 50);
 
-  // Camera positioned to see the desk well on both orientations
+  // Camera positioned to see the full desk with margin on all sides
   if (aspect < 1) {
-    // Portrait (mobile) — pull back, look slightly above desk center
-    camera.position.set(0, 0.55, 0.45);
-    camera.lookAt(0, 0, -0.03);
+    // Portrait — higher up, further back
+    camera.position.set(0, 0.6, 0.55);
+    camera.lookAt(0, 0, 0);
   } else {
-    // Landscape (mobile/desktop) — desk centered with space on all sides
-    camera.position.set(0, 0.42, 0.38);
-    camera.lookAt(0, 0, -0.02);
+    // Landscape — higher and further back so bottom edge is visible
+    camera.position.set(0, 0.5, 0.45);
+    camera.lookAt(0, 0, 0);
   }
   return camera;
 }
