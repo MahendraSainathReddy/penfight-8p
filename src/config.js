@@ -41,7 +41,7 @@ export const SETTLE = {
 };
 
 export const TURN = {
-  // No timeout — players take as long as they need
+  timeoutMs: 180000, // 3 minutes per turn, then auto-skip
 };
 
 // 8 player colors

@@ -242,14 +242,14 @@ export class NetworkManager {
       });
 
       conn.on('close', () => {
-        // Delay disconnect detection to allow orientation changes and brief reconnects
+        // Brief delay to allow reconnects, then mark as disconnected
         setTimeout(() => {
           // Check if they reconnected with a new connection
           const currentConn = this.connections.get(conn.peer);
           if (currentConn === conn || !currentConn) {
             this._handleDisconnect(conn.peer);
           }
-        }, 10000);
+        }, 3000);
       });
 
       conn.on('error', () => {

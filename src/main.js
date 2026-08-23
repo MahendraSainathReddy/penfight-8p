@@ -5,7 +5,7 @@ import { GameState } from './game/state.js';
 import { NetworkManager } from './net/network.js';
 import { LobbyUI } from './ui/lobby.js';
 import { HUD } from './ui/hud.js';
-import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, getPenStartPosition } from './config.js';
+import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, TURN, getPenStartPosition } from './config.js';
 
 class PenFightGame {
   constructor() {
@@ -153,9 +153,14 @@ class PenFightGame {
         if (!this.gameState.outs.has(seat)) {
           this.gameState.outs.add(seat);
           this.gameState.revision++;
-          // Hide their pen
+          // Hide their pen and freeze it
           if (this.penMeshes[seat]) {
             this.penMeshes[seat].visible = false;
+          }
+          if (this.penBodies[seat]) {
+            this.penBodies[seat].setLinvel({ x: 0, y: 0, z: 0 }, true);
+            this.penBodies[seat].setAngvel({ x: 0, y: 0, z: 0 }, true);
+            this.penBodies[seat].setTranslation({ x: 10, y: -1, z: 10 }, true); // move far off
           }
         }
 
@@ -715,7 +720,26 @@ class PenFightGame {
   }
 
   _checkTurnTimeout() {
-    // No timeout — players take as long as they need
+    if (!this.gameState || this.gameState.phase !== 'aiming') return;
+    // Host enforces timeout for all players
+    if (!this.network.isHost) return;
+
+    const elapsed = performance.now() - this.turnStartTime;
+
+    if (elapsed > TURN.timeoutMs) {
+      // Auto skip active player's turn
+      const currentSeat = this.gameState.activeSeat;
+      const next = this.gameState.getNextSeat(currentSeat);
+      if (next !== null) {
+        this.gameState.activeSeat = next;
+        this.gameState.turn++;
+        this.gameState.revision++;
+        this.turnStartTime = performance.now();
+        this.hud.notify(`${this._seatName(currentSeat)}'s turn skipped (timeout)`);
+        this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+        this._updateHUD();
+      }
+    }
   }
 
   _updateHUD() {
