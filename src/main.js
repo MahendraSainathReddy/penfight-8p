@@ -700,7 +700,8 @@ class PenFightGame {
     if (!this.gameState) return;
     this.gameState.restore(msg.state);
     if (msg.pens) {
-      this._setAllPenStates(msg.pens);
+      // Use smooth correction for ongoing syncs (not hard snap)
+      this._applySyncSmooth(msg.pens);
     }
 
     // If we synced into match_end state, show the end screen
@@ -971,51 +972,51 @@ class PenFightGame {
   }
 
   _setAllPenStates(pens) {
-    if (this.network.isHost) {
-      // Host is authoritative — apply directly
-      for (let i = 0; i < pens.length && i < this.penBodies.length; i++) {
-        setPenState(this.penBodies[i], pens[i]);
-      }
-    } else {
-      // Guest: store target states for smooth interpolation
-      this._syncTargets = pens;
+    // Apply pen states directly — used for initial setup, round resets, and reconnects
+    for (let i = 0; i < pens.length && i < this.penBodies.length; i++) {
+      setPenState(this.penBodies[i], pens[i]);
     }
+    this._syncTargets = null; // Clear any interpolation targets
   }
 
-  _interpolatePens() {
-    // Smoothly lerp guest pen bodies toward host's authoritative positions
-    if (!this._syncTargets || this.network.isHost) return;
+  _applySyncSmooth(pens) {
+    // For ongoing game syncs (during settling), only correct if drifted significantly
+    // This lets local physics run smoothly while preventing desync
+    if (this.network.isHost) return; // Host is authoritative, doesn't need correction
 
-    const lerpFactor = 0.3; // Blend 30% toward target each frame (at 60fps ≈ smooth catch-up)
-
-    for (let i = 0; i < this._syncTargets.length && i < this.penBodies.length; i++) {
-      const target = this._syncTargets[i];
-      if (!target) continue;
+    for (let i = 0; i < pens.length && i < this.penBodies.length; i++) {
+      if (!pens[i]) continue;
       if (this.gameState && this.gameState.outs.has(i)) continue;
 
       const body = this.penBodies[i];
       const pos = body.translation();
-      const tPos = { x: target.p[0], y: target.p[1], z: target.p[2] };
+      const target = pens[i];
 
-      // Lerp position
-      const newX = pos.x + (tPos.x - pos.x) * lerpFactor;
-      const newZ = pos.z + (tPos.z - pos.z) * lerpFactor;
-      body.setTranslation({ x: newX, y: tPos.y, z: newZ }, true);
+      // Calculate position drift
+      const dx = target.p[0] - pos.x;
+      const dz = target.p[2] - pos.z;
+      const drift = Math.sqrt(dx * dx + dz * dz);
 
-      // Slerp rotation (for Y-only rotation, lerp the quaternion)
-      const rot = body.rotation();
-      const tRot = { x: target.q[0], y: target.q[1], z: target.q[2], w: target.q[3] };
-      body.setRotation({
-        x: 0,
-        y: rot.y + (tRot.y - rot.y) * lerpFactor,
-        z: 0,
-        w: rot.w + (tRot.w - rot.w) * lerpFactor,
-      }, true);
-
-      // Apply target velocity so local physics continues in right direction
-      body.setLinvel({ x: target.lv[0], y: 0, z: target.lv[2] }, true);
-      body.setAngvel({ x: 0, y: target.av[1], z: 0 }, true);
+      if (drift > 0.05) {
+        // Large drift — snap to correct position (pen teleported or major desync)
+        setPenState(body, target);
+      } else if (drift > 0.005) {
+        // Small drift — gently nudge toward correct position
+        body.setTranslation({
+          x: pos.x + dx * 0.15,
+          y: target.p[1],
+          z: pos.z + dz * 0.15
+        }, true);
+        // Apply host's velocity so physics continues correctly
+        body.setLinvel({ x: target.lv[0], y: 0, z: target.lv[2] }, true);
+        body.setAngvel({ x: 0, y: target.av[1], z: 0 }, true);
+      }
+      // If drift < 0.005, don't touch it — local physics is accurate enough
     }
+  }
+
+  _interpolatePens() {
+    // No longer needed — smooth correction happens in _applySyncSmooth
   }
 
   _seatName(seat) {
@@ -1060,9 +1061,6 @@ class PenFightGame {
     }
     if (steps === SIM.maxSubSteps) this.accumulator = 0;
 
-    // Smooth interpolation for guests toward host's authoritative state
-    this._interpolatePens();
-
     // Sync meshes to physics
     for (let i = 0; i < this.penBodies.length; i++) {
       syncPenMesh(this.penMeshes[i], this.penBodies[i]);
@@ -1104,9 +1102,9 @@ class PenFightGame {
       this._checkSettle();
       this._checkTurnTimeout();
 
-      // Periodic sync during settling to keep clients aligned (every 150ms for smooth motion)
+      // Periodic sync during settling to correct client drift
       if (this.gameState && this.gameState.phase === 'settling') {
-        if (!this._lastSyncTime || time - this._lastSyncTime > 150) {
+        if (!this._lastSyncTime || time - this._lastSyncTime > 300) {
           this._lastSyncTime = time;
           this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
         }
