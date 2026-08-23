@@ -617,7 +617,7 @@ export class NetworkManager {
   // Sync full state
   sendSync(state, pens) {
     if (!this.isHost) return;
-    const msg = { type: 'sync', state, pens };
+    const msg = { type: 'sync', state, pens, players: this.players };
     this._broadcast(msg);
   }
 

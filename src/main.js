@@ -164,8 +164,6 @@ class PenFightGame {
       this.isSpectator = true;
       this.mySeat = -1;
       this.players = msg.players;
-      // We'll receive a sync message shortly with full state + pen positions
-      // For now, start with a default state and wait for sync
       const totalPlayers = msg.players.length;
       this._startSpectatorMode(totalPlayers);
     };
@@ -700,9 +698,20 @@ class PenFightGame {
   _applySync(msg) {
     if (!this.gameState) return;
     this.gameState.restore(msg.state);
+
+    // Update players list if provided in sync
+    if (msg.players) {
+      this.players = msg.players;
+    }
+
     if (msg.pens) {
-      // Use smooth correction for ongoing syncs (not hard snap)
-      this._applySyncSmooth(msg.pens);
+      // Spectators and initial syncs: hard-set positions
+      // Regular players: gentle drift correction
+      if (this.isSpectator) {
+        this._setAllPenStates(msg.pens);
+      } else {
+        this._applySyncSmooth(msg.pens);
+      }
     }
 
     // If we synced into match_end state, show the end screen
