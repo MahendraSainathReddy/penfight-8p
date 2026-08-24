@@ -705,13 +705,9 @@ class PenFightGame {
     }
 
     if (msg.pens) {
-      // Spectators and initial syncs: hard-set positions
-      // Regular players: gentle drift correction
-      if (this.isSpectator) {
-        this._setAllPenStates(msg.pens);
-      } else {
-        this._applySyncSmooth(msg.pens);
-      }
+      // Hard-set pen positions — this is only sent for reconnects,
+      // spectators, and background recovery (not during normal gameplay)
+      this._setAllPenStates(msg.pens);
     }
 
     // If we synced into match_end state, show the end screen
@@ -982,51 +978,9 @@ class PenFightGame {
   }
 
   _setAllPenStates(pens) {
-    // Apply pen states directly — used for initial setup, round resets, and reconnects
     for (let i = 0; i < pens.length && i < this.penBodies.length; i++) {
       setPenState(this.penBodies[i], pens[i]);
     }
-    this._syncTargets = null; // Clear any interpolation targets
-  }
-
-  _applySyncSmooth(pens) {
-    // For ongoing game syncs (during settling), only correct if drifted significantly
-    // This lets local physics run smoothly while preventing desync
-    if (this.network.isHost) return; // Host is authoritative, doesn't need correction
-
-    for (let i = 0; i < pens.length && i < this.penBodies.length; i++) {
-      if (!pens[i]) continue;
-      if (this.gameState && this.gameState.outs.has(i)) continue;
-
-      const body = this.penBodies[i];
-      const pos = body.translation();
-      const target = pens[i];
-
-      // Calculate position drift
-      const dx = target.p[0] - pos.x;
-      const dz = target.p[2] - pos.z;
-      const drift = Math.sqrt(dx * dx + dz * dz);
-
-      if (drift > 0.05) {
-        // Large drift — snap to correct position (pen teleported or major desync)
-        setPenState(body, target);
-      } else if (drift > 0.005) {
-        // Small drift — gently nudge toward correct position
-        body.setTranslation({
-          x: pos.x + dx * 0.15,
-          y: target.p[1],
-          z: pos.z + dz * 0.15
-        }, true);
-        // Apply host's velocity so physics continues correctly
-        body.setLinvel({ x: target.lv[0], y: 0, z: target.lv[2] }, true);
-        body.setAngvel({ x: 0, y: target.av[1], z: 0 }, true);
-      }
-      // If drift < 0.005, don't touch it — local physics is accurate enough
-    }
-  }
-
-  _interpolatePens() {
-    // No longer needed — smooth correction happens in _applySyncSmooth
   }
 
   _seatName(seat) {
@@ -1119,13 +1073,9 @@ class PenFightGame {
       this._checkSettle();
       this._checkTurnTimeout();
 
-      // Periodic sync during settling to correct client drift
-      if (this.gameState && this.gameState.phase === 'settling') {
-        if (!this._lastSyncTime || time - this._lastSyncTime > 300) {
-          this._lastSyncTime = time;
-          this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
-        }
-      }
+      // No periodic position syncs during settling — all clients run identical physics
+      // with identical inputs, so positions match naturally. Only the settle RESULT
+      // (who's out) is sent via sendSettle when physics fully stops.
     }
 
     // Render
