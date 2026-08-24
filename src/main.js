@@ -87,6 +87,7 @@ class PenFightGame {
         this.lobbyUI.showLobby(code, this.players, false, this.mySeat);
       } catch (err) {
         clearTimeout(joinTimeout);
+        localStorage.removeItem('pf8_active_room');
         this.lobbyUI.showError(err.message);
       }
     };
@@ -216,7 +217,7 @@ class PenFightGame {
         // Check if only 1 player remains — they win the round
         // Only host modifies scores — guests receive updates via sync
         const alive = this.gameState.getActivePlayers();
-        if (alive.length <= 1 && this.gameState.phase !== 'match_end' && this.network.isHost) {
+        if (alive.length <= 1 && this.gameState.phase !== 'match_end' && this.gameState.phase !== 'round_result' && this.network.isHost) {
           const winner = alive.length === 1 ? alive[0] : null;
           if (winner !== null) {
             this.gameState.scores[winner]++;
@@ -283,13 +284,32 @@ class PenFightGame {
     this.network.onError = (msg) => {
       if (!this.playing) {
         if (msg === 'Game already started. Wait for the next match.') {
-          // Offer spectate mode
           const params = new URLSearchParams(window.location.search);
           const roomCode = params.get('room') || this.network.roomCode;
           this.lobbyUI.showSpectateOffer(roomCode);
         } else {
           this.lobbyUI.showError(msg);
         }
+      }
+    };
+
+    this.network.onDisconnected = () => {
+      // Host connection permanently lost — show error and offer to reload
+      if (this.playing && this.hud) {
+        this.hud.notify('Connection to host lost!', 10000);
+        // Show match end screen with leave button after brief delay
+        setTimeout(() => {
+          if (this.playing && this.hud) {
+            this.hud.showMatchEnd(
+              'Connection lost',
+              this.gameState ? this.gameState.scores : [],
+              this.players,
+              this.mySeat,
+              () => { window.location.reload(); },
+              () => this._onLeave()
+            );
+          }
+        }, 3000);
       }
     };
   }
@@ -507,6 +527,10 @@ class PenFightGame {
 
   _onFlick(flickData) {
     if (!this.gameState.canShoot(this.mySeat)) return;
+
+    // Reset timeout skip counter
+    this._timeoutSkips = 0;
+    this._turnWarned = false;
 
     // Play flick sound
     playFlick(flickData.power);
@@ -926,11 +950,37 @@ class PenFightGame {
 
     const elapsed = performance.now() - this.turnStartTime;
 
+    // Warn at 30 seconds remaining
+    if (elapsed > TURN.timeoutMs - 30000 && !this._turnWarned) {
+      this._turnWarned = true;
+      this.hud.notify(`${this._seatName(this.gameState.activeSeat)} — 30s left!`, 3000);
+    }
+
     if (elapsed > TURN.timeoutMs) {
+      this._turnWarned = false;
       // Auto skip active player's turn
       const currentSeat = this.gameState.activeSeat;
       const next = this.gameState.getNextSeat(currentSeat);
       if (next !== null) {
+        // Track consecutive timeouts — if we've cycled through all players, force settle
+        if (!this._timeoutSkips) this._timeoutSkips = 0;
+        this._timeoutSkips++;
+        const alivePlayers = this.gameState.getActivePlayers().length;
+        if (this._timeoutSkips >= alivePlayers * 2) {
+          // Everyone timed out twice — end the round as a draw
+          this._timeoutSkips = 0;
+          this.gameState.phase = 'round_result';
+          this.hud.notify('Round ended (all players inactive)');
+          this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+          setTimeout(() => {
+            if (this.gameState.phase === 'round_result') {
+              this._advanceRound();
+            }
+          }, 3000);
+          this._updateHUD();
+          return;
+        }
+
         this.gameState.activeSeat = next;
         this.gameState.turn++;
         this.gameState.revision++;

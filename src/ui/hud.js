@@ -52,21 +52,26 @@ export class HUD {
 
       try {
         if (isFS) {
-          // Already fullscreen — exit
           if (exitFS) await exitFS.call(document);
           if (screen.orientation && screen.orientation.unlock) {
             screen.orientation.unlock();
           }
         } else {
-          // Enter fullscreen
-          if (requestFS) await requestFS.call(el);
-          // Try to lock orientation to landscape
-          if (screen.orientation && screen.orientation.lock) {
-            try { await screen.orientation.lock('landscape'); } catch (e) { /* not supported */ }
+          if (requestFS) {
+            await requestFS.call(el);
+            if (screen.orientation && screen.orientation.lock) {
+              try { await screen.orientation.lock('landscape'); } catch (e) { /* not supported */ }
+            }
+          } else {
+            // No fullscreen API (iPhone) — inform user
+            if (this.notifyEl) {
+              this.notifyEl.textContent = 'Rotate your phone to landscape';
+              this.notifyEl.classList.add('show');
+              setTimeout(() => this.notifyEl.classList.remove('show'), 2000);
+            }
           }
         }
       } catch (e) {
-        // Fallback: just try fullscreen
         try {
           if (requestFS && !isFS) await requestFS.call(el);
         } catch (e2) { /* give up */ }
@@ -92,11 +97,14 @@ export class HUD {
   }
 
   showReaction(playerName, emoji, color) {
+    // Limit toast count to prevent DOM accumulation
+    while (this.reactionToastEl.children.length >= 5) {
+      this.reactionToastEl.firstChild.remove();
+    }
     const toast = document.createElement('div');
     toast.className = 'reaction-toast-item';
     toast.innerHTML = `<span style="color:${color}">${escapeHtml(playerName)}</span> ${emoji}`;
     this.reactionToastEl.appendChild(toast);
-    // Animate in then remove
     setTimeout(() => toast.classList.add('show'), 10);
     setTimeout(() => {
       toast.classList.remove('show');

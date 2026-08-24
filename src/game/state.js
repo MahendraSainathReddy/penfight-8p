@@ -101,11 +101,12 @@ export class GameState {
     if (this.phase !== 'round_result') return false;
     this.round++;
     this.turn++;
-    this.opener = (this.opener + 1) % this.totalPlayers;
-    this.activeSeat = this.opener;
     this.outs = new Set();
     this.phase = 'aiming';
     this.revision++;
+    // Advance opener, skipping to a valid seat if needed
+    this.opener = (this.opener + 1) % this.totalPlayers;
+    this.activeSeat = this.opener;
     return true;
   }
 

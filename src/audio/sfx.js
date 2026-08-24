@@ -10,7 +10,7 @@ function getCtx() {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (ctx.state === 'suspended') {
-    ctx.resume();
+    ctx.resume().catch(() => {});
   }
   return ctx;
 }
