@@ -86,11 +86,11 @@ export class NetworkManager {
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
             { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' },
-            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-          ]
+            { urls: 'turn:standard.relay.metered.ca:80', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+            { urls: 'turn:standard.relay.metered.ca:443', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+            { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+          ],
+          iceTransportPolicy: 'all',
         }
       });
 
@@ -154,10 +154,11 @@ export class NetworkManager {
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-          ]
+            { urls: 'turn:standard.relay.metered.ca:80', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+            { urls: 'turn:standard.relay.metered.ca:443', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+            { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+          ],
+          iceTransportPolicy: 'all',
         }
       });
 
@@ -179,7 +180,6 @@ export class NetworkManager {
         const hostPeerId = this._getHostPeerId(this.roomCode);
 
         const conn = this.peer.connect(hostPeerId, {
-          reliable: true,
           serialization: 'json',
         });
 
@@ -277,7 +277,7 @@ export class NetworkManager {
       setTimeout(() => {
         if (this.peer && !this.peer.destroyed && this.roomCode) {
           const hostPeerId = this._getHostPeerId(this.roomCode);
-          const newConn = this.peer.connect(hostPeerId, { reliable: true, serialization: 'json' });
+          const newConn = this.peer.connect(hostPeerId, { serialization: 'json' });
           newConn.on('open', () => {
             this.hostConnection = newConn;
             this._setupGuestListeners(newConn);
@@ -639,10 +639,11 @@ export class NetworkManager {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-            { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-          ]
+            { urls: 'turn:standard.relay.metered.ca:80', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+            { urls: 'turn:standard.relay.metered.ca:443', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+            { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+          ],
+          iceTransportPolicy: 'all',
         }
       });
 
@@ -654,7 +655,7 @@ export class NetworkManager {
       this.peer.on('open', (id) => {
         this.myPeerId = id;
         const hostPeerId = this._getHostPeerId(this.roomCode);
-        const conn = this.peer.connect(hostPeerId, { reliable: true, serialization: 'json' });
+        const conn = this.peer.connect(hostPeerId, { serialization: 'json' });
 
         conn.on('open', () => {
           this.hostConnection = conn;
