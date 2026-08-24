@@ -1052,7 +1052,7 @@ class PenFightGame {
       // Render current state
       for (let i = 0; i < this.penBodies.length; i++) {
         syncPenMesh(this.penMeshes[i], this.penBodies[i]);
-        this.penMeshes[i].visible = !this.gameState.outs.has(i) && isPenOnDesk(this.penBodies[i]);
+        this.penMeshes[i].visible = !this.gameState.outs.has(i);
       }
       this.renderer.render(this.scene, this.camera);
       return;
@@ -1074,8 +1074,13 @@ class PenFightGame {
     // Sync meshes to physics
     for (let i = 0; i < this.penBodies.length; i++) {
       syncPenMesh(this.penMeshes[i], this.penBodies[i]);
-      // Hide pens that are out OR have fallen off the desk edge
-      this.penMeshes[i].visible = !this.gameState.outs.has(i) && isPenOnDesk(this.penBodies[i]);
+      // Host: hide pens that are out OR off-desk (local authority)
+      // Guests: only hide pens the host confirmed as out (avoid false positives from physics divergence)
+      if (this.network.isHost) {
+        this.penMeshes[i].visible = !this.gameState.outs.has(i) && isPenOnDesk(this.penBodies[i]);
+      } else {
+        this.penMeshes[i].visible = !this.gameState.outs.has(i);
+      }
     }
 
     // Detect pen collisions (velocity spike) and play sound
@@ -1093,16 +1098,18 @@ class PenFightGame {
     }
 
     // Freeze pens that have gone off desk (stop them sliding forever)
-    // Play fahhh sound immediately when a pen crosses the edge
+    // Only host plays the instant sound — guests get it from _applySettle to avoid false positives
     for (let i = 0; i < this.penBodies.length; i++) {
       if (!isPenOnDesk(this.penBodies[i]) && !this.gameState.outs.has(i)) {
         this.penBodies[i].setLinvel({ x: 0, y: 0, z: 0 }, true);
         this.penBodies[i].setAngvel({ x: 0, y: 0, z: 0 }, true);
-        // Play sound once per pen going off
-        if (!this._penOutSounded) this._penOutSounded = new Set();
-        if (!this._penOutSounded.has(i)) {
-          this._penOutSounded.add(i);
-          playPenOut();
+        // Host plays sound instantly when pen crosses edge
+        if (this.network.isHost) {
+          if (!this._penOutSounded) this._penOutSounded = new Set();
+          if (!this._penOutSounded.has(i)) {
+            this._penOutSounded.add(i);
+            playPenOut();
+          }
         }
       }
     }
