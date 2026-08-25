@@ -139,10 +139,22 @@ export class FlickInput {
     const currentWorld = this._screenToWorld(sx, sy);
 
     if (strikeWorld && currentWorld) {
-      // Show line FROM strike point TO current finger (the pull-back)
+      // Clamp the aim line to a max length so it stays near the desk
+      const maxAimLen = 0.2; // max visual line length in world units
+      let ex = currentWorld.x;
+      let ez = currentWorld.z;
+      const adx = ex - strikeWorld.x;
+      const adz = ez - strikeWorld.z;
+      const aimLen = Math.sqrt(adx * adx + adz * adz);
+      if (aimLen > maxAimLen) {
+        ex = strikeWorld.x + (adx / aimLen) * maxAimLen;
+        ez = strikeWorld.z + (adz / aimLen) * maxAimLen;
+      }
+
+      // Show line FROM strike point TO clamped finger position (the pull-back)
       this.onAimUpdate({
         penPos: { x: strikeWorld.x, y: strikeWorld.y + 0.003, z: strikeWorld.z },
-        endPos: { x: currentWorld.x, y: currentWorld.y + 0.003, z: currentWorld.z },
+        endPos: { x: ex, y: strikeWorld.y + 0.003, z: ez },
         power,
       });
     }
