@@ -29,7 +29,7 @@ export const PEN = {
   restitution: 0.2,    // moderate bounce on collision
   linearDamping: 6.0,  // high drag — stops skating after collisions
   angularDamping: 6.0, // spin dies fast
-  selectionRadius: 0.05,
+  selectionRadius: 0.03,
 };
 
 export const SIM = {

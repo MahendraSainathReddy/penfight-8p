@@ -104,7 +104,7 @@ export class FlickInput {
     const dist = Math.sqrt(distX * distX + distZ * distZ);
 
     // Generous selection radius
-    return dist < PEN.selectionRadius * 1.5;
+    return dist < PEN.selectionRadius;
   }
 
   _onStart(sx, sy) {
