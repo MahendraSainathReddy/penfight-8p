@@ -944,7 +944,7 @@ class PenFightGame {
     // Send reaction to all players
     this.network.send({ type: 'reaction', seat: this.mySeat, emoji });
     // Show locally too
-    const color = PLAYER_COLORS[this.mySeat];
+    const color = PLAYER_COLORS[this.mySeat] || { hex: '#ffffff' };
     this.hud.showReaction('You', emoji, color.hex);
   }
 
@@ -952,7 +952,7 @@ class PenFightGame {
     if (msg.seat === this.mySeat) return; // Already shown locally
     const player = this.players.find(p => p.seat === msg.seat);
     const name = player ? player.name : 'someone';
-    const color = PLAYER_COLORS[msg.seat];
+    const color = PLAYER_COLORS[msg.seat] || { hex: '#ffffff' };
     this.hud.showReaction(name, msg.emoji, color.hex);
   }
 
@@ -1006,7 +1006,7 @@ class PenFightGame {
   }
 
   _checkShrink() {
-    if (!this.gameState || this.gameState.phase === 'match_end') return;
+    if (!this.gameState || this.gameState.phase === 'match_end' || this.gameState.phase === 'round_result') return;
     if (!this._roundStartTime) this._roundStartTime = performance.now();
 
     const elapsed = performance.now() - this._roundStartTime;
@@ -1034,7 +1034,8 @@ class PenFightGame {
       this.hud.notify(`Table shrinking! (${Math.round((1 - shrinkFactor) * 100)}% smaller)`, 3000);
 
       // Host checks if any pens are now outside the new boundary — eliminate immediately
-      if (this.network.isHost) {
+      // Skip during settling — _doSettle will handle it
+      if (this.network.isHost && this.gameState.phase === 'aiming') {
         const newOuts = [];
         for (let i = 0; i < this.penBodies.length; i++) {
           if (this.gameState.outs.has(i)) continue;
