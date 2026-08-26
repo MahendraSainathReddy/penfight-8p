@@ -1012,11 +1012,12 @@ class PenFightGame {
     const elapsed = performance.now() - this._roundStartTime;
     if (elapsed < SHRINK.startDelayMs) return;
 
-    // Calculate how many shrink steps have occurred
+    // Calculate how many shrink steps should have occurred by now
     const stepsSinceStart = Math.floor((elapsed - SHRINK.startDelayMs) / SHRINK.intervalMs) + 1;
-    if (!this._shrinkStep) this._shrinkStep = 0;
+    if (this._shrinkStep === undefined) this._shrinkStep = 0;
 
     if (stepsSinceStart > this._shrinkStep) {
+      const wasMultipleStepsBehind = (stepsSinceStart - this._shrinkStep) > 1;
       this._shrinkStep = stepsSinceStart;
       const shrinkFactor = Math.max(1 - (this._shrinkStep * SHRINK.stepPercent), SHRINK.minScale);
 
@@ -1030,8 +1031,10 @@ class PenFightGame {
         this.deskMesh.scale.set(shrinkFactor, 1, shrinkFactor);
       }
 
-      // Notify players
-      this.hud.notify(`Table shrinking! (${Math.round((1 - shrinkFactor) * 100)}% smaller)`, 3000);
+      // Notify players (only on normal single-step advances, not catch-up jumps)
+      if (!wasMultipleStepsBehind) {
+        this.hud.notify(`Table shrinking! (${Math.round((1 - shrinkFactor) * 100)}% smaller)`, 3000);
+      }
 
       // Host checks if any pens are now outside the new boundary — eliminate immediately
       // Skip during settling — _doSettle will handle it
