@@ -1210,15 +1210,18 @@ class PenFightGame {
     }
 
     // Check settle (host only for authority)
+    // Check settle and timeout (host only for authority)
     if (this.network.isHost) {
       this._checkSettle();
       this._checkTurnTimeout();
-      this._checkShrink();
 
       // No periodic position syncs during settling — all clients run identical physics
       // with identical inputs, so positions match naturally. Only the settle RESULT
       // (who's out) is sent via sendSettle when physics fully stops.
     }
+
+    // Shrink runs on ALL clients for visual consistency
+    this._checkShrink();
 
     // Render
     this.renderer.render(this.scene, this.camera);
