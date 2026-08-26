@@ -542,7 +542,13 @@ export class NetworkManager {
 
   _handleDisconnect(peerId) {
     const player = this.players.find(p => p.peerId === peerId);
-    if (!player) return;
+    if (!player) {
+      // Might be a spectator — just clean up silently
+      this.connections.delete(peerId);
+      if (this._lastPong) this._lastPong.delete(peerId);
+      this.spectators = this.spectators.filter(s => s.peerId !== peerId);
+      return;
+    }
     if (!player.connected) return; // Already disconnected — don't fire twice
 
     player.connected = false;

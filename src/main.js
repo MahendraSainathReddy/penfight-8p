@@ -194,7 +194,7 @@ class PenFightGame {
     };
 
     this.network.onPlayerLeft = (seat) => {
-      if (this.playing) {
+      if (this.playing && !this.isSpectator) {
         const player = this.players.find(p => p.seat === seat);
         const name = player ? player.name : 'A player';
         this.hud.notify(`${name} left the game`);
@@ -296,20 +296,24 @@ class PenFightGame {
     this.network.onDisconnected = () => {
       // Host connection permanently lost — show error and offer to reload
       if (this.playing && this.hud) {
-        this.hud.notify('Connection to host lost!', 10000);
-        // Show match end screen with leave button after brief delay
-        setTimeout(() => {
-          if (this.playing && this.hud) {
-            this.hud.showMatchEnd(
-              'Connection lost',
-              this.gameState ? this.gameState.scores : [],
-              this.players,
-              this.mySeat,
-              () => { window.location.reload(); },
-              () => this._onLeave()
-            );
-          }
-        }, 3000);
+        if (this.isSpectator) {
+          this.hud.notify('Connection to game lost', 5000);
+          setTimeout(() => this._onLeave(), 5000);
+        } else {
+          this.hud.notify('Connection to host lost!', 10000);
+          setTimeout(() => {
+            if (this.playing && this.hud) {
+              this.hud.showMatchEnd(
+                'Connection lost',
+                this.gameState ? this.gameState.scores : [],
+                this.players,
+                this.mySeat,
+                () => { window.location.reload(); },
+                () => this._onLeave()
+              );
+            }
+          }, 3000);
+        }
       }
     };
   }
