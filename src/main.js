@@ -816,6 +816,7 @@ class PenFightGame {
     if (msg.pens) {
       this._setAllPenStates(msg.pens);
     }
+    this._resetShrink();
     this.hud.hideResult();
     this.turnStartTime = performance.now();
     this.turnWarned = false;
@@ -914,6 +915,7 @@ class PenFightGame {
     setDeskScale(deskScale);
     this._currentDeskScale = deskScale;
     this._penOutSounded = null; // Reset sound tracker for new match
+    this._resetShrink();
 
     // Reset pen positions
     this._restartGameState();
@@ -1016,27 +1018,22 @@ class PenFightGame {
 
     if (stepsSinceStart > this._shrinkStep) {
       this._shrinkStep = stepsSinceStart;
-      const shrinkFactor = 1 - (this._shrinkStep * SHRINK.stepPercent);
-      const newScale = Math.max(this._currentDeskScale * shrinkFactor, this._currentDeskScale * SHRINK.minScale);
+      const shrinkFactor = Math.max(1 - (this._shrinkStep * SHRINK.stepPercent), SHRINK.minScale);
 
-      // Update physics boundary
-      setDeskScale(newScale / (DESK.width / DESK.width)); // setDeskScale expects absolute scale
-      // Actually setDeskScale is the absolute scale multiplier for DESK.width
-      // We need to compute what the new absolute scale is
+      // Update physics boundary for all clients
       const baseScale = getDeskScale(this.gameState.totalPlayers);
       const absoluteNewScale = baseScale * shrinkFactor;
-      setDeskScale(Math.max(absoluteNewScale, baseScale * SHRINK.minScale));
+      setDeskScale(absoluteNewScale);
 
       // Visually shrink the desk mesh
       if (this.deskMesh) {
-        const visualFactor = Math.max(shrinkFactor, SHRINK.minScale);
-        this.deskMesh.scale.set(visualFactor, 1, visualFactor);
+        this.deskMesh.scale.set(shrinkFactor, 1, shrinkFactor);
       }
 
       // Notify players
       this.hud.notify(`Table shrinking! (${Math.round((1 - shrinkFactor) * 100)}% smaller)`, 3000);
 
-      // Check if any pens are now outside the new boundary — eliminate them immediately
+      // Host checks if any pens are now outside the new boundary — eliminate immediately
       if (this.network.isHost) {
         const newOuts = [];
         for (let i = 0; i < this.penBodies.length; i++) {
@@ -1046,7 +1043,6 @@ class PenFightGame {
           }
         }
         if (newOuts.length > 0) {
-          // Force a settle to eliminate pens caught in the shrink zone
           for (const seat of newOuts) {
             this.gameState.outs.add(seat);
             this.gameState.revision++;
@@ -1058,16 +1054,17 @@ class PenFightGame {
           // Check if round should end
           const alive = this.gameState.getActivePlayers();
           if (alive.length <= 1) {
-            // Trigger normal settle flow
             this.gameState.phase = 'settling';
             this._doSettle();
             return;
           }
-        }
 
-        // Host syncs the shrink to all
-        this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+          // Sync eliminations to guests
+          this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+        }
       }
+    }
+  }
     }
   }
 
