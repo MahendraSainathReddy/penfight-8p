@@ -1017,6 +1017,10 @@ class PenFightGame {
     if (this._shrinkStep === undefined) this._shrinkStep = 0;
 
     if (stepsSinceStart > this._shrinkStep) {
+      // Don't advance past the minimum scale
+      const nextFactor = 1 - ((this._shrinkStep + 1) * SHRINK.stepPercent);
+      if (nextFactor < SHRINK.minScale && this._shrinkStep > 0) return; // Already at minimum
+
       const wasMultipleStepsBehind = (stepsSinceStart - this._shrinkStep) > 1;
       this._shrinkStep = stepsSinceStart;
       const shrinkFactor = Math.max(1 - (this._shrinkStep * SHRINK.stepPercent), SHRINK.minScale);
