@@ -1036,8 +1036,36 @@ class PenFightGame {
       // Notify players
       this.hud.notify(`Table shrinking! (${Math.round((1 - shrinkFactor) * 100)}% smaller)`, 3000);
 
-      // Host syncs the shrink to all
+      // Check if any pens are now outside the new boundary — eliminate them immediately
       if (this.network.isHost) {
+        const newOuts = [];
+        for (let i = 0; i < this.penBodies.length; i++) {
+          if (this.gameState.outs.has(i)) continue;
+          if (!isPenOnDesk(this.penBodies[i])) {
+            newOuts.push(i);
+          }
+        }
+        if (newOuts.length > 0) {
+          // Force a settle to eliminate pens caught in the shrink zone
+          for (const seat of newOuts) {
+            this.gameState.outs.add(seat);
+            this.gameState.revision++;
+          }
+          playPenOut();
+          const names = newOuts.map(s => this._seatName(s));
+          this.hud.notify(`${names.join(' & ')} caught in shrink zone!`);
+
+          // Check if round should end
+          const alive = this.gameState.getActivePlayers();
+          if (alive.length <= 1) {
+            // Trigger normal settle flow
+            this.gameState.phase = 'settling';
+            this._doSettle();
+            return;
+          }
+        }
+
+        // Host syncs the shrink to all
         this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
       }
     }
