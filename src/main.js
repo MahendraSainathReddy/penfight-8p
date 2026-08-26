@@ -1065,8 +1065,6 @@ class PenFightGame {
       }
     }
   }
-    }
-  }
 
   _resetShrink() {
     this._roundStartTime = performance.now();
