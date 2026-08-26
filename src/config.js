@@ -21,6 +21,13 @@ export function getDeskScale(totalPlayers) {
   return 1.35 + (totalPlayers - 6) * 0.05; // 6=1.35, 7=1.40, 8=1.45
 }
 
+export const SHRINK = {
+  startDelayMs: 60000,    // Start shrinking 60s into each round
+  intervalMs: 30000,      // Shrink every 30s after that
+  stepPercent: 0.08,      // Shrink 8% each step
+  minScale: 0.5,          // Don't shrink below 50% of original
+};
+
 export const PEN = {
   radius: 0.004,       // smaller visible pens
   halfLength: 0.038,   // shorter pens — less dominant on board

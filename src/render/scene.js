@@ -127,28 +127,6 @@ export function createDeskMesh(scene, scale = 1.0) {
   deskMesh.castShadow = true;
   scene.add(deskMesh);
 
-  // === Desk border / frame (darker wood edge) ===
-  const borderThickness = 0.012;
-  const borderHeight = DESK.height + 0.007;
-  const borderColor = 0x5c3d2e;
-  
-  const borders = [
-    { w: w + borderThickness * 2, h: borderHeight, d: borderThickness, x: 0, z: d / 2 + borderThickness / 2 },
-    { w: w + borderThickness * 2, h: borderHeight, d: borderThickness, x: 0, z: -d / 2 - borderThickness / 2 },
-    { w: borderThickness, h: borderHeight, d: d, x: w / 2 + borderThickness / 2, z: 0 },
-    { w: borderThickness, h: borderHeight, d: d, x: -w / 2 - borderThickness / 2, z: 0 },
-  ];
-  
-  for (const b of borders) {
-    const geo = new THREE.BoxGeometry(b.w, b.h, b.d);
-    const mat = new THREE.MeshStandardMaterial({ color: borderColor, roughness: 0.8, metalness: 0.1 });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(b.x, -DESK.height / 2 + borderHeight / 2 - 0.004, b.z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
-  }
-
   // === Desk legs ===
   const legGeo = new THREE.CylinderGeometry(0.012, 0.014, 0.32, 8);
   const legMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.9, metalness: 0.2 });
@@ -274,6 +252,42 @@ export function createPenMesh(scene, seatIndex) {
 
   scene.add(group);
   return group;
+}
+
+export function addPenLabel(penGroup, name, color) {
+  // Create a canvas texture with the player name
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+
+  // Truncate name to fit
+  const maxChars = 8;
+  const displayName = name.length > maxChars ? name.slice(0, maxChars) : name;
+
+  ctx.clearRect(0, 0, 128, 32);
+  ctx.font = 'bold 18px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  ctx.lineWidth = 3;
+  ctx.strokeText(displayName, 64, 16);
+  ctx.fillText(displayName, 64, 16);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(0.04, 0.01, 1); // small label above pen
+  sprite.position.set(0, 0.015, 0); // float above pen center
+  penGroup.add(sprite);
+  return sprite;
 }
 
 export function syncPenMesh(mesh, body) {

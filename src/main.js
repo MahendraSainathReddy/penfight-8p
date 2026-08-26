@@ -1,11 +1,11 @@
 import { initPhysics, createWorld, createDesk, createWalls, createPen, getPenState, setPenState, isPenOnDesk, isPenSettled, setDeskScale } from './physics/world.js';
-import { createScene, createCamera, createRenderer, createDeskMesh, createPenMesh, syncPenMesh, createAimLine, updateAimLine } from './render/scene.js';
+import { createScene, createCamera, createRenderer, createDeskMesh, createPenMesh, syncPenMesh, createAimLine, updateAimLine, addPenLabel } from './render/scene.js';
 import { FlickInput } from './input/flick.js';
 import { GameState } from './game/state.js';
 import { NetworkManager } from './net/network.js';
 import { LobbyUI } from './ui/lobby.js';
 import { HUD } from './ui/hud.js';
-import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, TURN, DESK, getDeskScale, getPenStartPosition } from './config.js';
+import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, TURN, DESK, SHRINK, getDeskScale, getPenStartPosition } from './config.js';
 import { unlockAudio, playFlick, playCollision, playPenOut, playRoundWin, playMatchWin, playTurnNotify } from './audio/sfx.js';
 
 class PenFightGame {
@@ -342,7 +342,7 @@ class PenFightGame {
     setDeskScale(deskScale);
     this._currentDeskScale = deskScale;
     this.camera = createCamera(this.renderer, deskScale);
-    createDeskMesh(this.scene, deskScale);
+    this.deskMesh = createDeskMesh(this.scene, deskScale);
     this.aimLine = createAimLine(this.scene);
 
     // Setup physics
@@ -359,6 +359,9 @@ class PenFightGame {
       this.penBodies.push(body);
 
       const mesh = createPenMesh(this.scene, i);
+      // Add player name label on pen
+      const player = this.players.find(p => p.seat === i);
+      if (player) addPenLabel(mesh, player.name, PLAYER_COLORS[i].hex);
       this.penMeshes.push(mesh);
     }
 
@@ -438,7 +441,7 @@ class PenFightGame {
     setDeskScale(deskScale);
     this._currentDeskScale = deskScale;
     this.camera = createCamera(this.renderer, deskScale);
-    createDeskMesh(this.scene, deskScale);
+    this.deskMesh = createDeskMesh(this.scene, deskScale);
     this.aimLine = createAimLine(this.scene);
 
     // Setup physics (for visual interpolation on spectator side)
@@ -454,6 +457,9 @@ class PenFightGame {
       const body = createPen(this.world, pos.x, pos.z, pos.yaw);
       this.penBodies.push(body);
       const mesh = createPenMesh(this.scene, i);
+      // Add player name label on pen
+      const player = this.players.find(p => p.seat === i);
+      if (player) addPenLabel(mesh, player.name, PLAYER_COLORS[i].hex);
       this.penMeshes.push(mesh);
     }
 
@@ -792,6 +798,7 @@ class PenFightGame {
     }
 
     this._penOutSounded = null; // Reset for new round
+    this._resetShrink();
     this.hud.hideResult();
     this.turnStartTime = performance.now();
     this.turnWarned = false;
@@ -992,6 +999,58 @@ class PenFightGame {
     }
   }
 
+  _checkShrink() {
+    if (!this.gameState || this.gameState.phase === 'match_end') return;
+    if (!this._roundStartTime) this._roundStartTime = performance.now();
+
+    const elapsed = performance.now() - this._roundStartTime;
+    if (elapsed < SHRINK.startDelayMs) return;
+
+    // Calculate how many shrink steps have occurred
+    const stepsSinceStart = Math.floor((elapsed - SHRINK.startDelayMs) / SHRINK.intervalMs) + 1;
+    if (!this._shrinkStep) this._shrinkStep = 0;
+
+    if (stepsSinceStart > this._shrinkStep) {
+      this._shrinkStep = stepsSinceStart;
+      const shrinkFactor = 1 - (this._shrinkStep * SHRINK.stepPercent);
+      const newScale = Math.max(this._currentDeskScale * shrinkFactor, this._currentDeskScale * SHRINK.minScale);
+
+      // Update physics boundary
+      setDeskScale(newScale / (DESK.width / DESK.width)); // setDeskScale expects absolute scale
+      // Actually setDeskScale is the absolute scale multiplier for DESK.width
+      // We need to compute what the new absolute scale is
+      const baseScale = getDeskScale(this.gameState.totalPlayers);
+      const absoluteNewScale = baseScale * shrinkFactor;
+      setDeskScale(Math.max(absoluteNewScale, baseScale * SHRINK.minScale));
+
+      // Visually shrink the desk mesh
+      if (this.deskMesh) {
+        const visualFactor = Math.max(shrinkFactor, SHRINK.minScale);
+        this.deskMesh.scale.set(visualFactor, 1, visualFactor);
+      }
+
+      // Notify players
+      this.hud.notify(`Table shrinking! (${Math.round((1 - shrinkFactor) * 100)}% smaller)`, 3000);
+
+      // Host syncs the shrink to all
+      if (this.network.isHost) {
+        this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+      }
+    }
+  }
+
+  _resetShrink() {
+    this._roundStartTime = performance.now();
+    this._shrinkStep = 0;
+    // Reset desk to full scale
+    const baseScale = getDeskScale(this.gameState ? this.gameState.totalPlayers : 2);
+    setDeskScale(baseScale);
+    this._currentDeskScale = baseScale;
+    if (this.deskMesh) {
+      this.deskMesh.scale.set(1, 1, 1);
+    }
+  }
+
   _updateHUD() {
     if (!this.hud || !this.gameState) return;
 
@@ -1122,6 +1181,7 @@ class PenFightGame {
     if (this.network.isHost) {
       this._checkSettle();
       this._checkTurnTimeout();
+      this._checkShrink();
 
       // No periodic position syncs during settling — all clients run identical physics
       // with identical inputs, so positions match naturally. Only the settle RESULT
