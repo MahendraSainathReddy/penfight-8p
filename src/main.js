@@ -1234,12 +1234,12 @@ class PenFightGame {
     // Scale camera position based on current desk scale
     const scale = this._currentDeskScale || 1.0;
     if (aspect < 1) {
-      // Portrait
-      this.camera.position.set(0, 0.6 * scale, 0.55 * scale);
+      // Portrait — more overhead
+      this.camera.position.set(0, 0.7 * scale, 0.25 * scale);
       this.camera.lookAt(0, 0, 0);
     } else {
-      // Landscape
-      this.camera.position.set(0, 0.5 * scale, 0.45 * scale);
+      // Landscape — more overhead
+      this.camera.position.set(0, 0.6 * scale, 0.2 * scale);
       this.camera.lookAt(0, 0, 0);
     }
   }

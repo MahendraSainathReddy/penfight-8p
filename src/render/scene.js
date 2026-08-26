@@ -44,12 +44,14 @@ export function createCamera(renderer, scale = 1.0) {
   const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 50);
 
-  // Camera positioned to see the full desk with margin — scales with board size
+  // More overhead view — looking almost straight down at the desk
   if (aspect < 1) {
-    camera.position.set(0, 0.6 * scale, 0.55 * scale);
+    // Portrait
+    camera.position.set(0, 0.7 * scale, 0.25 * scale);
     camera.lookAt(0, 0, 0);
   } else {
-    camera.position.set(0, 0.5 * scale, 0.45 * scale);
+    // Landscape
+    camera.position.set(0, 0.6 * scale, 0.2 * scale);
     camera.lookAt(0, 0, 0);
   }
   return camera;
@@ -127,27 +129,6 @@ export function createDeskMesh(scene, scale = 1.0) {
   deskMesh.castShadow = true;
   scene.add(deskMesh);
 
-  // === Desk legs ===
-  const legGeo = new THREE.CylinderGeometry(0.012, 0.014, 0.32, 8);
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.9, metalness: 0.2 });
-  const legOffsetX = w / 2 - 0.035;
-  const legOffsetZ = d / 2 - 0.035;
-  const legY = -DESK.height - 0.16;
-  
-  const legPositions = [
-    [legOffsetX, legY, legOffsetZ],
-    [-legOffsetX, legY, legOffsetZ],
-    [legOffsetX, legY, -legOffsetZ],
-    [-legOffsetX, legY, -legOffsetZ],
-  ];
-  
-  for (const pos of legPositions) {
-    const leg = new THREE.Mesh(legGeo, legMat);
-    leg.position.set(...pos);
-    leg.castShadow = true;
-    scene.add(leg);
-  }
-
   // === Floor ===
   const floorGeo = new THREE.PlaneGeometry(5, 5);
   const floorCanvas = document.createElement('canvas');
@@ -179,7 +160,7 @@ export function createDeskMesh(scene, scale = 1.0) {
   });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -DESK.height - 0.32;
+  floor.position.y = -DESK.height - 0.01;
   floor.receiveShadow = true;
   scene.add(floor);
 
