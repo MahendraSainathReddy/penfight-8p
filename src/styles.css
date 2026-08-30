@@ -763,3 +763,72 @@ html, body {
     padding: 2px 8px;
   }
 }
+
+/* === Taunt Button & Panel === */
+.hud-taunt-btn {
+  position: absolute;
+  top: 268px;
+  right: 12px;
+  pointer-events: auto;
+}
+
+.hud-taunt-panel {
+  position: absolute;
+  top: 268px;
+  right: 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 30;
+  pointer-events: auto;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.hud-taunt-panel.hidden {
+  display: none;
+}
+
+.taunt-item {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.taunt-item:active,
+.taunt-item:hover {
+  background: rgba(230, 57, 70, 0.5);
+}
+
+.reaction-toast-item.taunt {
+  background: rgba(40, 20, 20, 0.85);
+  border: 1px solid rgba(230, 57, 70, 0.4);
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .hud-taunt-btn {
+    top: 232px;
+  }
+  .hud-taunt-panel {
+    top: 232px;
+    right: 48px;
+  }
+  .taunt-item {
+    font-size: 0.72rem;
+    padding: 6px 10px;
+  }
+}

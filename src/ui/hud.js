@@ -2,6 +2,22 @@ import { PLAYER_COLORS } from '../config.js';
 
 const REACTION_EMOJIS = ['😂', '🔥', '💀', '👏', '😤', '😭'];
 
+// Fun & evil preset taunts friends use
+const TAUNT_MESSAGES = [
+  'Too easy! 😎',
+  'Get rekt! 💥',
+  'Say bye bye 👋',
+  'Nice try loser 😏',
+  'Is that all? 🥱',
+  'You\'re done! 🔪',
+  'Cry about it 😢',
+  'Skill issue 🤓',
+  'Watch this! 🎯',
+  'Boom! 💣',
+  'GG EZ 🏆',
+  'Sit down 💺',
+];
+
 /**
  * In-game HUD: scoreboard, turn indicator, results, notifications, reactions.
  */
@@ -14,6 +30,8 @@ export class HUD {
       <div id="hud-scoreboard" class="hud-scoreboard"></div>
       <div id="hud-timers" class="hud-timers"></div>
       <div id="hud-reactions" class="hud-reactions"></div>
+      <button id="hud-taunt-btn" class="reaction-btn hud-taunt-btn" title="Taunt">&#x1F4AC;</button>
+      <div id="hud-taunt-panel" class="hud-taunt-panel hidden"></div>
       <div id="hud-turn" class="hud-turn"></div>
       <div id="hud-notify" class="hud-notify"></div>
       <div id="hud-result" class="hud-result hidden"></div>
@@ -33,6 +51,38 @@ export class HUD {
     this._setupLandscapeButton();
     this._setupLeaveButton();
     this._setupReactions();
+    this._setupTaunts();
+  }
+
+  _setupTaunts() {
+    const btn = document.getElementById('hud-taunt-btn');
+    const panel = document.getElementById('hud-taunt-panel');
+    if (!btn || !panel) return;
+
+    // Build the taunt list
+    panel.innerHTML = TAUNT_MESSAGES.map(msg =>
+      `<button class="taunt-item" data-msg="${escapeHtml(msg)}">${escapeHtml(msg)}</button>`
+    ).join('');
+
+    // Toggle panel on button click
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      panel.classList.toggle('hidden');
+    });
+
+    // Send taunt on item click
+    panel.addEventListener('click', (e) => {
+      const item = e.target.closest('.taunt-item');
+      if (!item) return;
+      const msg = item.dataset.msg;
+      if (this.onReaction) this.onReaction(msg, true); // true = isTaunt
+      panel.classList.add('hidden');
+    });
+
+    // Close panel when clicking elsewhere
+    document.addEventListener('click', () => {
+      panel.classList.add('hidden');
+    });
   }
 
   updateTimers(turnSeconds, shrinkSeconds) {
@@ -111,20 +161,24 @@ export class HUD {
     });
   }
 
-  showReaction(playerName, emoji, color) {
+  showReaction(playerName, content, color, isTaunt = false) {
     // Limit toast count to prevent DOM accumulation
     while (this.reactionToastEl.children.length >= 5) {
       this.reactionToastEl.firstChild.remove();
     }
     const toast = document.createElement('div');
-    toast.className = 'reaction-toast-item';
-    toast.innerHTML = `<span style="color:${color}">${escapeHtml(playerName)}</span> ${emoji}`;
+    toast.className = isTaunt ? 'reaction-toast-item taunt' : 'reaction-toast-item';
+    if (isTaunt) {
+      toast.innerHTML = `<span style="color:${color}">${escapeHtml(playerName)}:</span> ${escapeHtml(content)}`;
+    } else {
+      toast.innerHTML = `<span style="color:${color}">${escapeHtml(playerName)}</span> ${content}`;
+    }
     this.reactionToastEl.appendChild(toast);
     setTimeout(() => toast.classList.add('show'), 10);
     setTimeout(() => {
       toast.classList.remove('show');
       setTimeout(() => toast.remove(), 300);
-    }, 2500);
+    }, 3000);
   }
 
   updateScoreboard(players, scores, outs, mySeat) {

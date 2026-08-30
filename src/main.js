@@ -940,12 +940,12 @@ class PenFightGame {
     updateAimLine(this.aimLine, aim.penPos, aim.endPos);
   }
 
-  _onReaction(emoji) {
-    // Send reaction to all players
-    this.network.send({ type: 'reaction', seat: this.mySeat, emoji });
+  _onReaction(content, isTaunt = false) {
+    // Send reaction/taunt to all players
+    this.network.send({ type: 'reaction', seat: this.mySeat, emoji: content, isTaunt });
     // Show locally too
     const color = PLAYER_COLORS[this.mySeat] || { hex: '#ffffff' };
-    this.hud.showReaction('You', emoji, color.hex);
+    this.hud.showReaction('You', content, color.hex, isTaunt);
   }
 
   _handleReaction(msg) {
@@ -953,7 +953,7 @@ class PenFightGame {
     const player = this.players.find(p => p.seat === msg.seat);
     const name = player ? player.name : 'someone';
     const color = PLAYER_COLORS[msg.seat] || { hex: '#ffffff' };
-    this.hud.showReaction(name, msg.emoji, color.hex);
+    this.hud.showReaction(name, msg.emoji, color.hex, msg.isTaunt || false);
   }
 
   _checkTurnTimeout() {
