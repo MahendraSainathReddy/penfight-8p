@@ -297,37 +297,60 @@ export function createPenMesh(scene, seatIndex) {
 }
 
 export function addPenLabel(penGroup, name, color) {
-  // Create a canvas texture with the player name
+  // Create a high-res canvas texture with the player name
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 32;
+  canvas.width = 512;
+  canvas.height = 128;
   const ctx = canvas.getContext('2d');
 
   // Truncate name to fit
-  const maxChars = 8;
+  const maxChars = 10;
   const displayName = name.length > maxChars ? name.slice(0, maxChars) : name;
 
-  ctx.clearRect(0, 0, 128, 32);
-  ctx.font = 'bold 18px Inter, sans-serif';
+  ctx.clearRect(0, 0, 512, 128);
+
+  // Rounded dark pill background for readability
+  const padX = 20;
+  ctx.font = 'bold 64px Inter, Arial, sans-serif';
+  const textW = ctx.measureText(displayName).width;
+  const pillW = Math.min(textW + padX * 2, 500);
+  const pillH = 90;
+  const pillX = (512 - pillW) / 2;
+  const pillY = (128 - pillH) / 2;
+  const radius = pillH / 2;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.beginPath();
+  ctx.moveTo(pillX + radius, pillY);
+  ctx.arcTo(pillX + pillW, pillY, pillX + pillW, pillY + pillH, radius);
+  ctx.arcTo(pillX + pillW, pillY + pillH, pillX, pillY + pillH, radius);
+  ctx.arcTo(pillX, pillY + pillH, pillX, pillY, radius);
+  ctx.arcTo(pillX, pillY, pillX + pillW, pillY, radius);
+  ctx.closePath();
+  ctx.fill();
+
+  // Text
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-  ctx.lineWidth = 3;
-  ctx.strokeText(displayName, 64, 16);
-  ctx.fillText(displayName, 64, 16);
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.lineWidth = 6;
+  ctx.strokeText(displayName, 256, 66);
+  ctx.fillText(displayName, 256, 66);
 
   const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 8;
   texture.needsUpdate = true;
 
   const spriteMat = new THREE.SpriteMaterial({
     map: texture,
     transparent: true,
     depthTest: false,
+    depthWrite: false,
   });
   const sprite = new THREE.Sprite(spriteMat);
-  sprite.scale.set(0.04, 0.01, 1); // small label above pen
-  sprite.position.set(0, 0.015, 0); // float above pen center
+  sprite.scale.set(0.1, 0.025, 1); // larger label
+  sprite.position.set(0, 0.03, 0); // float higher above pen
+  sprite.renderOrder = 999; // always on top
   penGroup.add(sprite);
   return sprite;
 }
