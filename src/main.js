@@ -548,15 +548,29 @@ class PenFightGame {
     }
   }
 
+  // True once the current turn has run past the timeout. Every client enforces
+  // this locally so the active player can't flick after the timer hits 0 while
+  // waiting for the host's skip to round-trip back. Small grace margin avoids
+  // unfairly rejecting a flick that lands right at the 0s boundary.
+  _turnExpired() {
+    if (!this.turnStartTime) return false;
+    const elapsed = performance.now() - this.turnStartTime;
+    return elapsed > TURN.timeoutMs + 300;
+  }
+
   _canFlick() {
     if (this.isSpectator) return null;
     if (!this.gameState) return null;
+    if (this._turnExpired()) return null; // turn timed out — no more flicking
     if (this.gameState.canShoot(this.mySeat)) return this.mySeat;
     return null;
   }
 
   _onFlick(flickData) {
     if (!this.gameState.canShoot(this.mySeat)) return;
+    // Block flicks after the turn timer has expired (mirrors _canFlick) so a
+    // late drag-release can't sneak a shot in before the host's skip arrives.
+    if (this._turnExpired()) return;
 
     // Reset timeout skip counter
     this._timeoutSkips = 0;
@@ -1083,7 +1097,10 @@ class PenFightGame {
 
     const elapsed = performance.now() - this.turnStartTime;
 
-    if (elapsed > TURN.timeoutMs) {
+    // Skip slightly after the client-side flick block (timeoutMs + 300ms) so the
+    // active player's own client always gets the final say on a borderline flick
+    // before the host force-skips them. Prevents a skip/shot desync at the edge.
+    if (elapsed > TURN.timeoutMs + 500) {
       // Auto skip active player's turn
       const currentSeat = this.gameState.activeSeat;
       const next = this.gameState.getNextSeat(currentSeat);
