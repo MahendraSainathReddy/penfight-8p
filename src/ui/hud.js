@@ -254,15 +254,34 @@ export class HUD {
   }
 
   showMatchEnd(winnerName, scores, players, mySeat, onRematch, onLeave) {
-    const scoreText = players.map(p => {
+    // Rank players by score (highest first) for a proper final standings list.
+    const ranked = [...players].sort((a, b) => (scores[b.seat] || 0) - (scores[a.seat] || 0));
+    const topScore = ranked.length ? (scores[ranked[0].seat] || 0) : 0;
+    // The winner is the top-ranked player; use their color to theme the card.
+    const winnerPlayer = ranked.find(p => (scores[p.seat] || 0) === topScore) || ranked[0];
+    const winnerColor = winnerPlayer ? PLAYER_COLORS[winnerPlayer.seat].hex : '#ffffff';
+    const iWon = winnerPlayer && winnerPlayer.seat === mySeat;
+
+    const standings = ranked.map((p, i) => {
       const color = PLAYER_COLORS[p.seat];
-      return `<span style="color:${color.hex}">${escapeHtml(p.name)}: ${scores[p.seat]}</span>`;
-    }).join(' &middot; ');
+      const isMe = p.seat === mySeat;
+      const medal = i === 0 ? '🏆' : `${i + 1}`;
+      return `
+        <div class="standing-row ${i === 0 ? 'winner' : ''} ${isMe ? 'me' : ''}" style="--pc:${color.hex}; animation-delay:${0.15 + i * 0.08}s">
+          <span class="standing-rank">${medal}</span>
+          <span class="standing-dot"></span>
+          <span class="standing-name">${escapeHtml(p.name)}${isMe ? ' (you)' : ''}</span>
+          <span class="standing-score">${scores[p.seat] || 0}</span>
+        </div>
+      `;
+    }).join('');
 
     this.resultEl.innerHTML = `
-      <div class="match-end">
-        <h2>${escapeHtml(winnerName)} wins the match!</h2>
-        <p class="final-scores">${scoreText}</p>
+      <div class="match-end winner-card" style="--win:${winnerColor}">
+        <div class="winner-crown">🏆</div>
+        <h2 class="winner-title">${escapeHtml(winnerName)} wins!</h2>
+        <p class="winner-sub">${iWon ? 'Nicely done — you took the match.' : 'Match over. Final standings:'}</p>
+        <div class="standings">${standings}</div>
         <div class="match-end-btns">
           <button id="btn-rematch" class="btn btn-primary">Rematch</button>
           <button id="btn-leave" class="btn btn-secondary">Leave</button>
@@ -275,6 +294,67 @@ export class HUD {
 
     document.getElementById('btn-rematch').addEventListener('click', onRematch);
     document.getElementById('btn-leave').addEventListener('click', onLeave);
+
+    this._launchConfetti(winnerColor);
+  }
+
+  // Lightweight canvas confetti burst — self-contained, cleans up after itself.
+  _launchConfetti(baseColor) {
+    // Respect reduced-motion preference.
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'confetti-canvas';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    this.container.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+
+    const palette = [baseColor, '#ffd166', '#ff6b6b', '#06d6a0', '#4d96ff', '#ffffff'];
+    const N = 140;
+    const parts = [];
+    for (let i = 0; i < N; i++) {
+      parts.push({
+        x: canvas.width / 2 + (Math.random() - 0.5) * 120,
+        y: canvas.height / 2 - 40,
+        vx: (Math.random() - 0.5) * 12,
+        vy: -Math.random() * 12 - 4,
+        size: 4 + Math.random() * 6,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 0.3,
+        color: palette[(Math.random() * palette.length) | 0],
+      });
+    }
+
+    const gravity = 0.28;
+    const start = performance.now();
+    const DURATION = 2600;
+
+    const tick = (now) => {
+      const t = now - start;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const p of parts) {
+        p.vy += gravity;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.vr;
+        p.vx *= 0.99;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.globalAlpha = Math.max(0, 1 - t / DURATION);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        ctx.restore();
+      }
+      if (t < DURATION) {
+        this._confettiRaf = requestAnimationFrame(tick);
+      } else {
+        canvas.remove();
+        this._confettiRaf = null;
+      }
+    };
+    this._confettiRaf = requestAnimationFrame(tick);
   }
 
   showHostLeft(onLeave) {
@@ -330,6 +410,10 @@ export class HUD {
     if (this.notifyTimer) {
       clearTimeout(this.notifyTimer);
       this.notifyTimer = null;
+    }
+    if (this._confettiRaf) {
+      cancelAnimationFrame(this._confettiRaf);
+      this._confettiRaf = null;
     }
     this.container.innerHTML = '';
   }
