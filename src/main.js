@@ -811,7 +811,26 @@ class PenFightGame {
   _applySync(msg) {
     if (!this.gameState) return;
     if (this._isStaleState(msg.state)) return;
+
+    // Remember the turn we were on so we can detect an actual turn change and
+    // restart the turn clock accordingly (a routine mid-turn sync must NOT
+    // reset the countdown).
+    const prevTurn = this.gameState.turn;
+    const prevActive = this.gameState.activeSeat;
+
     this.gameState.restore(msg.state);
+
+    // Keep the turn timer alive on guests: syncs are the only path that can
+    // move a guest into 'aiming' without a settle/next_round, so establish a
+    // turnStartTime here. Reset it only when the turn actually advanced;
+    // otherwise seed it once if it was never set.
+    if (this.gameState.phase === 'aiming') {
+      const turnChanged = this.gameState.turn !== prevTurn || this.gameState.activeSeat !== prevActive;
+      if (turnChanged || !this.turnStartTime) {
+        this.turnStartTime = performance.now();
+        this._turnWarned = false;
+      }
+    }
 
     // Update players list if provided in sync
     if (msg.players) {
@@ -1227,8 +1246,11 @@ class PenFightGame {
     let turnSeconds = null;
     let shrinkSeconds = null;
 
-    // Turn timer — only during aiming, and not for spectators
-    if (!this.isSpectator && this.gameState.phase === 'aiming' && this.turnStartTime) {
+    // Turn timer — only during aiming, and not for spectators.
+    // Lazily seed turnStartTime if it was never set (mirrors _checkShrink's
+    // _roundStartTime fallback) so the countdown can never render blank.
+    if (!this.isSpectator && this.gameState.phase === 'aiming') {
+      if (!this.turnStartTime) this.turnStartTime = performance.now();
       const elapsed = performance.now() - this.turnStartTime;
       turnSeconds = Math.max(0, Math.ceil((TURN.timeoutMs - elapsed) / 1000));
 
