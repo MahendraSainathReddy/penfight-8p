@@ -282,6 +282,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  z-index: 10;
+  pointer-events: none;
 }
 
 .score-item {
@@ -676,7 +678,7 @@ html, body {
 /* === Spectator Badge === */
 .hud-spectator-count {
   position: absolute;
-  top: 12px;
+  top: 46px;
   left: 50%;
   transform: translateX(-50%);
   padding: 4px 12px;
@@ -716,15 +718,21 @@ html, body {
 }
 
 /* === Turn / Shrink Timers === */
+/* Top-center so they never collide with the scoreboard as players are added */
 .hud-timers {
   position: absolute;
-  top: 90px;
-  left: 14px;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  flex-direction: row;
+  gap: 6px;
   pointer-events: none;
   z-index: 10;
+}
+
+.hud-timers:empty {
+  display: none;
 }
 
 .timer-row {
@@ -754,9 +762,12 @@ html, body {
 }
 
 @media (max-width: 480px) {
-  .hud-timers {
-    top: 66px;
+  .hud-scoreboard {
+    top: 8px;
     left: 8px;
+  }
+  .hud-timers {
+    top: 8px;
   }
   .timer-row {
     font-size: 0.62rem;
@@ -765,17 +776,19 @@ html, body {
 }
 
 /* === Taunt Button & Panel === */
+/* Bottom-left, stacked just above the turn pill; clear of the scoreboard */
 .hud-taunt-btn {
   position: absolute;
-  top: 138px;
-  left: 14px;
+  bottom: 62px;
+  left: 16px;
+  z-index: 20;
   pointer-events: auto;
 }
 
 .hud-taunt-panel {
-  position: absolute;
-  top: 138px;
-  left: 56px;
+  position: fixed;
+  bottom: 106px;
+  left: 16px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -820,15 +833,6 @@ html, body {
 }
 
 @media (max-width: 480px) {
-  .hud-taunt-btn {
-    top: 110px;
-    left: 8px;
-  }
-  .hud-taunt-panel {
-    top: 110px;
-    left: 48px;
-    right: auto;
-  }
   .taunt-item {
     font-size: 0.72rem;
     padding: 6px 10px;

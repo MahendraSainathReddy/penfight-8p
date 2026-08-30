@@ -141,6 +141,16 @@ class PenFightGame {
       this._applySync(msg);
     };
 
+    // Host provides authoritative shrink state (elapsed time + step) to attach
+    // to every sync, so guests stay aligned even across background pauses.
+    this.network.onGetShrinkState = () => {
+      if (!this._roundStartTime) return null;
+      return {
+        elapsed: performance.now() - this._roundStartTime,
+        step: this._shrinkStep || 0,
+      };
+    };
+
     this.network.onNextRound = (msg) => {
       this._applyNextRound(msg);
     };
@@ -754,6 +764,13 @@ class PenFightGame {
       this._setAllPenStates(msg.pens);
     }
 
+    // Apply the host's authoritative shrink state (guests only). Rebase the
+    // host's elapsed time onto our local clock so shrink stays in lockstep
+    // even if either side was briefly backgrounded.
+    if (msg.shrink && !this.network.isHost) {
+      this._applyShrinkState(msg.shrink);
+    }
+
     // If we synced into match_end state, show the end screen
     if (msg.state.phase === 'match_end' && msg.state.winner !== null) {
       const winner = this.players.find(p => p.seat === msg.state.winner);
@@ -1104,6 +1121,25 @@ class PenFightGame {
     }
   }
 
+  // Guest-side: adopt the host's authoritative shrink progress. Rebases the
+  // host's elapsed time onto our local performance.now() clock and applies the
+  // matching desk scale so the table size and shrink timer match the host.
+  _applyShrinkState(shrink) {
+    if (!this.gameState) return;
+    const elapsed = Math.max(0, shrink.elapsed || 0);
+    this._roundStartTime = performance.now() - elapsed;
+    this._shrinkStep = shrink.step || 0;
+
+    // Apply the desk scale that corresponds to the host's shrink step.
+    const shrinkFactor = Math.max(1 - (this._shrinkStep * SHRINK.stepPercent), SHRINK.minScale);
+    const baseScale = getDeskScale(this.gameState.totalPlayers);
+    setDeskScale(baseScale * shrinkFactor);
+    this._currentDeskScale = baseScale * shrinkFactor;
+    if (this.deskMesh) {
+      this.deskMesh.scale.set(shrinkFactor, 1, shrinkFactor);
+    }
+  }
+
   _updateTimers() {
     if (!this.hud || !this.gameState) return;
 
@@ -1190,6 +1226,13 @@ class PenFightGame {
     // Instead, request a state sync from host to get back in sync.
     if (rawDt > 500) {
       this.accumulator = 0;
+
+      // rAF was frozen while backgrounded, but performance.now() kept advancing.
+      // Shift timer baselines forward by the frozen gap so the turn/shrink timers
+      // resume smoothly instead of jumping ahead or instantly timing out.
+      if (this.turnStartTime) this.turnStartTime += rawDt;
+      if (this._roundStartTime) this._roundStartTime += rawDt;
+
       // Request sync from host if we're a guest
       if (!this.network.isHost && this.network.hostConnection) {
         this.network._send(this.network.hostConnection, { type: 'request_sync', seat: this.mySeat });

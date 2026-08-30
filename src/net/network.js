@@ -40,6 +40,7 @@ export class NetworkManager {
     this.onShot = null;
     this.onSettled = null;
     this.onSync = null;
+    this.onGetShrinkState = null; // host-only: returns authoritative shrink state to attach to syncs
     this.onNextRound = null;
     this.onPlayerLeft = null;
     this.onRematchVote = null;
@@ -273,41 +274,65 @@ export class NetworkManager {
     });
 
     conn.on('close', () => {
-      // Connection closed — try to reconnect before declaring host lost
+      // Connection closed — try to reconnect before declaring host lost.
+      // The host may just be briefly backgrounded/asleep (common on mobile),
+      // so retry several times over a longer window before giving up.
       console.warn('Connection to host closed, will attempt reconnect...');
-      setTimeout(() => {
-        if (this.peer && !this.peer.destroyed && this.roomCode) {
-          const hostPeerId = this._getHostPeerId(this.roomCode);
-          let reconnected = false;
-          const newConn = this.peer.connect(hostPeerId, { serialization: 'json' });
-
-          // If reconnect doesn't succeed within 6s, declare host gone
-          const reconnectTimeout = setTimeout(() => {
-            if (!reconnected) {
-              this._declareHostLost();
-            }
-          }, 6000);
-
-          newConn.on('open', () => {
-            reconnected = true;
-            clearTimeout(reconnectTimeout);
-            this.hostConnection = newConn;
-            this._setupGuestListeners(newConn);
-            this._send(newConn, { type: 'join', name: this.myName, peerId: this.myPeerId, spectator: this.isSpectator || false });
-          });
-          newConn.on('error', () => {
-            clearTimeout(reconnectTimeout);
-            if (!reconnected) this._declareHostLost();
-          });
-        } else {
-          this._declareHostLost();
-        }
-      }, 2000);
+      this._attemptReconnect(0);
     });
 
     conn.on('error', (err) => {
       console.warn('Guest connection error:', err);
       // Don't immediately declare disconnected — the close handler will attempt reconnect
+    });
+  }
+
+  // Guest-side: retry connecting to the host several times before declaring it lost.
+  // Tolerates a host that is briefly backgrounded/asleep (common on mobile).
+  _attemptReconnect(attempt) {
+    const MAX_ATTEMPTS = 5;      // ~5 tries
+    const ATTEMPT_DELAY = 4000;  // 4s between attempts → ~20s total grace window
+    const OPEN_TIMEOUT = 5000;   // wait up to 5s for each attempt to open
+
+    if (this._hostLostFired) return; // already gave up
+
+    if (attempt >= MAX_ATTEMPTS || !this.peer || this.peer.destroyed || !this.roomCode) {
+      this._declareHostLost();
+      return;
+    }
+
+    // Make sure our peer is connected to the signaling server before dialing.
+    if (this.peer.disconnected && !this.peer.destroyed) {
+      try { this.peer.reconnect(); } catch (e) { /* ignore */ }
+    }
+
+    const hostPeerId = this._getHostPeerId(this.roomCode);
+    let settled = false;
+    const newConn = this.peer.connect(hostPeerId, { serialization: 'json' });
+
+    const openTimeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { newConn.close(); } catch (e) { /* ignore */ }
+      // Schedule the next attempt.
+      setTimeout(() => this._attemptReconnect(attempt + 1), ATTEMPT_DELAY);
+    }, OPEN_TIMEOUT);
+
+    newConn.on('open', () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(openTimeout);
+      this.hostConnection = newConn;
+      this._setupGuestListeners(newConn);
+      this._send(newConn, { type: 'join', name: this.myName, peerId: this.myPeerId, spectator: this.isSpectator || false });
+      console.warn(`Reconnected to host on attempt ${attempt + 1}`);
+    });
+
+    newConn.on('error', () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(openTimeout);
+      setTimeout(() => this._attemptReconnect(attempt + 1), ATTEMPT_DELAY);
     });
   }
 
@@ -663,10 +688,16 @@ export class NetworkManager {
     if (this.isHost && this.onShot) this.onShot(msg);
   }
 
-  // Sync full state
+  // Sync full state. Attaches authoritative shrink state so guests apply the
+  // host's shrink progress instead of computing their own (prevents drift when
+  // the host or a guest was briefly backgrounded).
   sendSync(state, pens) {
     if (!this.isHost) return;
     const msg = { type: 'sync', state, pens, players: this.players };
+    if (this.onGetShrinkState) {
+      const shrink = this.onGetShrinkState();
+      if (shrink) msg.shrink = shrink;
+    }
     this._broadcast(msg);
   }
 
@@ -752,31 +783,53 @@ export class NetworkManager {
   }
 
   // Keepalive: host pings all clients every 8s, clients respond with pong.
-  // Host force-disconnects clients that haven't responded in 20s.
+  // Host force-disconnects clients that haven't responded in STALE_TIMEOUT ms.
   _startKeepAlive() {
     this._lastPong = new Map(); // peerId -> timestamp
+    this._lastKeepAliveTick = Date.now();
+
+    const KEEPALIVE_MS = 5000;      // tick every 5s (was 8s) for faster liveness
+    const STALE_TIMEOUT_MS = 30000; // consider a peer dead after 30s of silence (was 20s)
+    // If the interval itself was delayed (host tab throttled/asleep) by more than
+    // this, skip the disconnect sweep for one cycle so we don't nuke everyone on resume.
+    const THROTTLE_GRACE_MS = KEEPALIVE_MS * 2.5;
 
     this._keepAliveInterval = setInterval(() => {
+      const now = Date.now();
+      const sinceLastTick = now - (this._lastKeepAliveTick || now);
+      this._lastKeepAliveTick = now;
+
       if (this.isHost) {
         // Host pings all clients
-        this._broadcast({ type: 'ping', t: Date.now() });
+        this._broadcast({ type: 'ping', t: now });
 
-        // Check for dead connections (no pong in 20s)
-        const now = Date.now();
+        // If our own timer was throttled (backgrounded), give clients a grace
+        // period to respond before we judge them as disconnected.
+        if (sinceLastTick > THROTTLE_GRACE_MS) {
+          console.warn(`Keepalive resumed after ${sinceLastTick}ms gap — skipping disconnect sweep this cycle`);
+          // Refresh everyone's clock so a resumed host doesn't instantly drop them.
+          for (const peerId of this.connections.keys()) {
+            this._lastPong.set(peerId, now);
+          }
+          return;
+        }
+
+        // Check for dead connections (no pong in STALE_TIMEOUT_MS)
         for (const [peerId, conn] of this.connections) {
           const lastSeen = this._lastPong.get(peerId) || now;
-          if (now - lastSeen > 20000) {
+          if (now - lastSeen > STALE_TIMEOUT_MS) {
             // Player hasn't responded — force disconnect
             console.warn('Force disconnecting unresponsive player:', peerId);
             this._lastPong.delete(peerId);
             this._handleDisconnect(peerId);
           }
         }
-      } else if (this.hostConnection) {
-        // Guest sends pong to host
-        this._send(this.hostConnection, { type: 'pong', seat: this.mySeat, t: Date.now() });
+      } else if (this.hostConnection && this.hostConnection.open) {
+        // Guest proactively sends pong to host (don't wait for a ping — the host's
+        // ping interval may itself be throttled).
+        this._send(this.hostConnection, { type: 'pong', seat: this.mySeat, t: now });
       }
-    }, 8000);
+    }, KEEPALIVE_MS);
 
     // Handle page visibility changes (orientation change, tab switch, etc.)
     // Prevent false disconnects when the page is briefly hidden

@@ -64,7 +64,8 @@ export class HUD {
       `<button class="taunt-item" data-msg="${escapeHtml(msg)}">${escapeHtml(msg)}</button>`
     ).join('');
 
-    // Toggle panel on button click
+    // Toggle panel on button click. The panel is positioned via CSS (anchored
+    // just above the taunt button), so no dynamic positioning is needed.
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       panel.classList.toggle('hidden');
@@ -212,7 +213,9 @@ export class HUD {
         badge = document.createElement('div');
         badge.id = 'hud-spectator-count';
         badge.className = 'hud-spectator-count';
-        this.scoreboard.parentElement.appendChild(badge);
+        // Append to the HUD container (not the left rail) so its centered
+        // absolute positioning stays relative to the viewport.
+        this.container.appendChild(badge);
       }
       badge.textContent = names ? `👁 ${names}` : `👁 ${count} watching`;
     } else if (badge) {
