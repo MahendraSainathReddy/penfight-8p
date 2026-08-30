@@ -273,6 +273,28 @@ export class HUD {
     document.getElementById('btn-leave').addEventListener('click', onLeave);
   }
 
+  showHostLeft(onLeave) {
+    this.resultEl.innerHTML = `
+      <div class="match-end">
+        <h2>Host left the game</h2>
+        <p class="final-scores">The room is closed. Start a new game to keep playing!</p>
+        <div class="match-end-btns">
+          <button id="btn-newgame" class="btn btn-primary">New Game</button>
+          <button id="btn-leave" class="btn btn-secondary">Leave</button>
+        </div>
+      </div>
+    `;
+    this.resultEl.classList.remove('hidden');
+    this.resultEl.classList.add('show');
+
+    const newGameBtn = document.getElementById('btn-newgame');
+    if (newGameBtn) newGameBtn.addEventListener('click', () => {
+      window.location.href = window.location.pathname;
+    });
+    const leaveBtn = document.getElementById('btn-leave');
+    if (leaveBtn) leaveBtn.addEventListener('click', onLeave);
+  }
+
   updateRematchStatus(votedNames, totalNeeded) {
     const el = document.getElementById('rematch-status');
     if (!el) return;

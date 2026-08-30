@@ -48,6 +48,7 @@ export class NetworkManager {
     this.onSpectateStart = null;
     this.onSpectatorUpdate = null;
     this.onGameRejoin = null;
+    this.onHostLost = null;
     this.onError = null;
     this.onConnected = null;
     this.onDisconnected = null;
@@ -272,24 +273,34 @@ export class NetworkManager {
     });
 
     conn.on('close', () => {
-      // Connection closed — try to reconnect before declaring lost
+      // Connection closed — try to reconnect before declaring host lost
       console.warn('Connection to host closed, will attempt reconnect...');
       setTimeout(() => {
         if (this.peer && !this.peer.destroyed && this.roomCode) {
           const hostPeerId = this._getHostPeerId(this.roomCode);
+          let reconnected = false;
           const newConn = this.peer.connect(hostPeerId, { serialization: 'json' });
+
+          // If reconnect doesn't succeed within 6s, declare host gone
+          const reconnectTimeout = setTimeout(() => {
+            if (!reconnected) {
+              this._declareHostLost();
+            }
+          }, 6000);
+
           newConn.on('open', () => {
+            reconnected = true;
+            clearTimeout(reconnectTimeout);
             this.hostConnection = newConn;
             this._setupGuestListeners(newConn);
-            // Include spectator flag on reconnect so spectators aren't rejected
             this._send(newConn, { type: 'join', name: this.myName, peerId: this.myPeerId, spectator: this.isSpectator || false });
           });
           newConn.on('error', () => {
-            if (this.onDisconnected) this.onDisconnected();
-            if (this.onError) this.onError('Lost connection to host');
+            clearTimeout(reconnectTimeout);
+            if (!reconnected) this._declareHostLost();
           });
         } else {
-          if (this.onDisconnected) this.onDisconnected();
+          this._declareHostLost();
         }
       }, 2000);
     });
@@ -554,6 +565,17 @@ export class NetworkManager {
       case 'game_in_progress':
         if (this.onError) this.onError('Game already started. Wait for the next match.');
         break;
+    }
+  }
+
+  _declareHostLost() {
+    if (this._hostLostFired) return; // Only fire once
+    this._hostLostFired = true;
+    console.warn('Host is gone — declaring host lost');
+    if (this.onHostLost) {
+      this.onHostLost();
+    } else if (this.onDisconnected) {
+      this.onDisconnected();
     }
   }
 

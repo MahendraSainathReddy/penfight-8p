@@ -316,6 +316,16 @@ class PenFightGame {
         }
       }
     };
+
+    this.network.onHostLost = () => {
+      // Host permanently left — show graceful "Host left" screen
+      if (this.playing && this.hud) {
+        this.hud.notify('Host left the game', 4000);
+        this.hud.showHostLeft(() => this._onLeave());
+      } else if (!this.playing) {
+        this.lobbyUI.showError('Host left the room. Please create or join another.');
+      }
+    };
   }
 
   _hostStartGame() {
