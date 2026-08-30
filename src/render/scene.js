@@ -3,19 +3,34 @@ import { DESK, PEN, PLAYER_COLORS, MAX_PLAYERS } from '../config.js';
 
 export function createScene() {
   const scene = new THREE.Scene();
-  
-  // Warm classroom gradient background
-  const bgColor = new THREE.Color(0x3d5a40);
-  scene.background = bgColor;
-  scene.fog = new THREE.Fog(bgColor, 2, 6);
 
-  // Ambient light — warm classroom feel
-  const ambient = new THREE.AmbientLight(0xfff5e6, 0.5);
+  // Soft radial gradient background (cozy room vibe)
+  const bgCanvas = document.createElement('canvas');
+  bgCanvas.width = 512;
+  bgCanvas.height = 512;
+  const bgCtx = bgCanvas.getContext('2d');
+  const grad = bgCtx.createRadialGradient(256, 200, 60, 256, 256, 400);
+  grad.addColorStop(0, '#4a6b5a');   // lighter warm green center
+  grad.addColorStop(0.5, '#33503f');
+  grad.addColorStop(1, '#1e3327');   // darker edges (vignette)
+  bgCtx.fillStyle = grad;
+  bgCtx.fillRect(0, 0, 512, 512);
+  const bgTexture = new THREE.CanvasTexture(bgCanvas);
+  scene.background = bgTexture;
+
+  scene.fog = new THREE.Fog(0x2a4234, 2.5, 7);
+
+  // Soft ambient light
+  const ambient = new THREE.AmbientLight(0xfff2e0, 0.55);
   scene.add(ambient);
 
-  // Main overhead light (like a classroom tube light)
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-  dirLight.position.set(0.5, 3, 1);
+  // Hemisphere light for natural sky/ground bounce
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x4a6b5a, 0.4);
+  scene.add(hemi);
+
+  // Main key light — warm overhead
+  const dirLight = new THREE.DirectionalLight(0xfff0dd, 1.1);
+  dirLight.position.set(0.6, 3, 1.2);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.set(2048, 2048);
   dirLight.shadow.camera.near = 0.5;
@@ -24,18 +39,21 @@ export function createScene() {
   dirLight.shadow.camera.right = 1;
   dirLight.shadow.camera.top = 1;
   dirLight.shadow.camera.bottom = -1;
-  dirLight.shadow.bias = -0.001;
+  dirLight.shadow.bias = -0.0005;
+  dirLight.shadow.radius = 4; // softer shadow edges
   scene.add(dirLight);
 
-  // Warm fill light from below-left
-  const fillLight = new THREE.DirectionalLight(0xffd4a0, 0.3);
-  fillLight.position.set(-2, 1, -1);
+  // Cool rim/fill light from opposite side for depth
+  const fillLight = new THREE.DirectionalLight(0xa0c0ff, 0.25);
+  fillLight.position.set(-2, 1.5, -1.5);
   scene.add(fillLight);
 
-  // Subtle point light above desk center for highlights
-  const pointLight = new THREE.PointLight(0xffeedd, 0.3, 2.5);
-  pointLight.position.set(0, 1.0, 0);
-  scene.add(pointLight);
+  // Warm accent spotlight over the desk center — pool of light
+  const spot = new THREE.SpotLight(0xffe4b8, 0.6, 3.5, Math.PI / 4, 0.5, 1.5);
+  spot.position.set(0, 1.6, 0.3);
+  spot.target.position.set(0, 0, 0);
+  scene.add(spot);
+  scene.add(spot.target);
 
   return scene;
 }
@@ -65,7 +83,7 @@ export function createRenderer() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
+  renderer.toneMappingExposure = 1.25;
   return renderer;
 }
 
@@ -74,88 +92,131 @@ export function createDeskMesh(scene, scale = 1.0) {
   const w = DESK.width * scale;
   const d = DESK.depth * scale;
   const deskGeo = new THREE.BoxGeometry(w, DESK.height, d);
-  
-  // Create a canvas texture for wood grain
+
+  // Rich procedural wood grain texture
   const woodCanvas = document.createElement('canvas');
-  woodCanvas.width = 512;
-  woodCanvas.height = 512;
+  woodCanvas.width = 1024;
+  woodCanvas.height = 1024;
   const ctx = woodCanvas.getContext('2d');
-  
-  // Base wood color
-  ctx.fillStyle = '#c8a06e';
-  ctx.fillRect(0, 0, 512, 512);
-  
-  // Wood grain lines
-  ctx.strokeStyle = '#b8905e';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 60; i++) {
+
+  // Base wood gradient (warm honey tones with variation)
+  const woodGrad = ctx.createLinearGradient(0, 0, 1024, 1024);
+  woodGrad.addColorStop(0, '#cba174');
+  woodGrad.addColorStop(0.3, '#c8a06e');
+  woodGrad.addColorStop(0.6, '#bd9560');
+  woodGrad.addColorStop(1, '#c49c68');
+  ctx.fillStyle = woodGrad;
+  ctx.fillRect(0, 0, 1024, 1024);
+
+  // Long flowing wood grain lines (planks)
+  for (let i = 0; i < 120; i++) {
+    const y = Math.random() * 1024;
+    const shade = 100 + Math.random() * 60;
+    ctx.strokeStyle = `rgba(${shade}, ${shade * 0.72}, ${shade * 0.45}, ${0.15 + Math.random() * 0.25})`;
+    ctx.lineWidth = 0.5 + Math.random() * 2;
     ctx.beginPath();
-    const y = Math.random() * 512;
     ctx.moveTo(0, y);
     ctx.bezierCurveTo(
-      128, y + (Math.random() - 0.5) * 20,
-      384, y + (Math.random() - 0.5) * 20,
-      512, y + (Math.random() - 0.5) * 10
+      256, y + (Math.random() - 0.5) * 30,
+      768, y + (Math.random() - 0.5) * 30,
+      1024, y + (Math.random() - 0.5) * 15
     );
     ctx.stroke();
   }
-  
-  // Subtle scratches
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i < 30; i++) {
+
+  // Plank separators (horizontal boards)
+  ctx.strokeStyle = 'rgba(90, 65, 40, 0.35)';
+  ctx.lineWidth = 2;
+  for (let py = 128; py < 1024; py += 170) {
     ctx.beginPath();
-    const x1 = Math.random() * 512;
-    const y1 = Math.random() * 512;
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x1 + (Math.random() - 0.5) * 80, y1 + (Math.random() - 0.5) * 80);
+    ctx.moveTo(0, py);
+    ctx.lineTo(1024, py);
     ctx.stroke();
   }
-  
+
+  // Subtle highlights / sheen streaks
+  ctx.strokeStyle = 'rgba(255, 240, 210, 0.08)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 40; i++) {
+    const y = Math.random() * 1024;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(1024, y + (Math.random() - 0.5) * 20);
+    ctx.stroke();
+  }
+
   const woodTexture = new THREE.CanvasTexture(woodCanvas);
   woodTexture.wrapS = THREE.RepeatWrapping;
   woodTexture.wrapT = THREE.RepeatWrapping;
-  
+  woodTexture.anisotropy = 8;
+
   const deskMat = new THREE.MeshStandardMaterial({
     map: woodTexture,
-    roughness: 0.65,
-    metalness: 0.0,
-    color: 0xd4a574,
+    roughness: 0.5,
+    metalness: 0.05,
+    color: 0xd8ab78,
   });
-  
+
   const deskMesh = new THREE.Mesh(deskGeo, deskMat);
   deskMesh.position.set(0, -DESK.height / 2, 0);
   deskMesh.receiveShadow = true;
   deskMesh.castShadow = true;
   scene.add(deskMesh);
 
-  // === Floor ===
-  const floorGeo = new THREE.PlaneGeometry(5, 5);
-  const floorCanvas = document.createElement('canvas');
-  floorCanvas.width = 256;
-  floorCanvas.height = 256;
-  const fctx = floorCanvas.getContext('2d');
-  
-  // Tile pattern floor
-  fctx.fillStyle = '#8a9a7b';
-  fctx.fillRect(0, 0, 256, 256);
-  fctx.strokeStyle = '#7a8a6b';
-  fctx.lineWidth = 2;
-  const tileSize = 32;
-  for (let x = 0; x < 256; x += tileSize) {
-    for (let y = 0; y < 256; y += tileSize) {
-      fctx.strokeRect(x, y, tileSize, tileSize);
-    }
+  // Thin polished edge trim around the desk for a finished look
+  const edgeMat = new THREE.MeshStandardMaterial({
+    color: 0x8a6a45,
+    roughness: 0.35,
+    metalness: 0.15,
+  });
+  const edgeThickness = 0.006;
+  const edgeH = DESK.height + 0.001;
+  const edges = [
+    { w: w + edgeThickness, h: edgeH, d: edgeThickness, x: 0, z: d / 2 },
+    { w: w + edgeThickness, h: edgeH, d: edgeThickness, x: 0, z: -d / 2 },
+    { w: edgeThickness, h: edgeH, d: d, x: w / 2, z: 0 },
+    { w: edgeThickness, h: edgeH, d: d, x: -w / 2, z: 0 },
+  ];
+  const edgeGroup = new THREE.Group();
+  for (const e of edges) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(e.w, e.h, e.d), edgeMat);
+    m.position.set(e.x, -DESK.height / 2, e.z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    edgeGroup.add(m);
   }
-  
+  // Attach edges to desk mesh so they scale together during shrink
+  deskMesh.add(edgeGroup);
+  // Compensate for parent scale — edges use local coords, fine
+
+  // === Floor — soft radial gradient (subtle, keeps focus on desk) ===
+  const floorGeo = new THREE.PlaneGeometry(8, 8);
+  const floorCanvas = document.createElement('canvas');
+  floorCanvas.width = 512;
+  floorCanvas.height = 512;
+  const fctx = floorCanvas.getContext('2d');
+
+  // Radial gradient — bright under desk, fading to dark edges
+  const fgrad = fctx.createRadialGradient(256, 256, 40, 256, 256, 280);
+  fgrad.addColorStop(0, '#7d8f6e');
+  fgrad.addColorStop(0.5, '#67785a');
+  fgrad.addColorStop(1, '#3f4d38');
+  fctx.fillStyle = fgrad;
+  fctx.fillRect(0, 0, 512, 512);
+
+  // Very subtle tile hint (faint)
+  fctx.strokeStyle = 'rgba(60, 75, 52, 0.25)';
+  fctx.lineWidth = 1;
+  const tileSize = 64;
+  for (let x = 0; x <= 512; x += tileSize) {
+    fctx.beginPath(); fctx.moveTo(x, 0); fctx.lineTo(x, 512); fctx.stroke();
+    fctx.beginPath(); fctx.moveTo(0, x); fctx.lineTo(512, x); fctx.stroke();
+  }
+
   const floorTexture = new THREE.CanvasTexture(floorCanvas);
-  floorTexture.wrapS = THREE.RepeatWrapping;
-  floorTexture.wrapT = THREE.RepeatWrapping;
-  floorTexture.repeat.set(4, 4);
-  
   const floorMat = new THREE.MeshStandardMaterial({
     map: floorTexture,
-    roughness: 0.9,
+    roughness: 0.95,
     metalness: 0.0,
   });
   const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -176,12 +237,12 @@ export function createPenMesh(scene, seatIndex) {
   // Simple but good-looking pen: cylinder body + cone tip + cap
   // Everything built lying along Z axis (matching physics)
 
-  // === Main barrel (cylinder along Z) ===
-  const barrelGeo = new THREE.CylinderGeometry(R, R, HL * 2, 16);
+  // === Main barrel (cylinder along Z) — glossy plastic ===
+  const barrelGeo = new THREE.CylinderGeometry(R, R, HL * 2, 24);
   const barrelMat = new THREE.MeshStandardMaterial({
     color: color.three,
-    roughness: 0.35,
-    metalness: 0.1,
+    roughness: 0.22,
+    metalness: 0.15,
   });
   const barrel = new THREE.Mesh(barrelGeo, barrelMat);
   barrel.rotation.x = Math.PI / 2; // lie along Z
