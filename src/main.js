@@ -963,14 +963,7 @@ class PenFightGame {
 
     const elapsed = performance.now() - this.turnStartTime;
 
-    // Warn at 30 seconds remaining
-    if (elapsed > TURN.timeoutMs - 30000 && !this._turnWarned) {
-      this._turnWarned = true;
-      this.hud.notify(`${this._seatName(this.gameState.activeSeat)} — 30s left!`, 3000);
-    }
-
     if (elapsed > TURN.timeoutMs) {
-      this._turnWarned = false;
       // Auto skip active player's turn
       const currentSeat = this.gameState.activeSeat;
       const next = this.gameState.getNextSeat(currentSeat);

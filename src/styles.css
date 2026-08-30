@@ -527,8 +527,8 @@ html, body {
 /* === Reaction Toasts === */
 .hud-reaction-toast {
   position: absolute;
-  top: 260px;
-  right: 12px;
+  top: 12px;
+  right: 56px;
   display: flex;
   flex-direction: column;
   gap: 4px;

@@ -281,7 +281,8 @@ export class NetworkManager {
           newConn.on('open', () => {
             this.hostConnection = newConn;
             this._setupGuestListeners(newConn);
-            this._send(newConn, { type: 'join', name: this.myName, peerId: this.myPeerId });
+            // Include spectator flag on reconnect so spectators aren't rejected
+            this._send(newConn, { type: 'join', name: this.myName, peerId: this.myPeerId, spectator: this.isSpectator || false });
           });
           newConn.on('error', () => {
             if (this.onDisconnected) this.onDisconnected();
@@ -349,9 +350,13 @@ export class NetworkManager {
         if (this.gameStarted) {
           // Check if they want to spectate
           if (msg.spectator) {
-            // Accept as spectator
-            const spec = { name: msg.name, peerId: msg.peerId };
-            this.spectators.push(spec);
+            // Accept as spectator — dedupe by peerId or name (reconnect)
+            const existingSpec = this.spectators.find(s => s.peerId === msg.peerId || s.name === msg.name);
+            if (existingSpec) {
+              existingSpec.peerId = msg.peerId;
+            } else {
+              this.spectators.push({ name: msg.name, peerId: msg.peerId });
+            }
             this.connections.set(msg.peerId, conn);
             if (this._lastPong) this._lastPong.set(msg.peerId, Date.now());
             this._send(conn, {
@@ -678,6 +683,13 @@ export class NetworkManager {
       this.peer.on('error', (err) => {
         clearTimeout(timeout);
         reject(new Error(`Connection error: ${err.type}`));
+      });
+
+      this.peer.on('disconnected', () => {
+        // Reconnect to signaling server
+        if (this.peer && !this.peer.destroyed) {
+          this.peer.reconnect();
+        }
       });
 
       this._joinResolve = () => {
