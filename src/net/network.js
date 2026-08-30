@@ -325,25 +325,37 @@ export class NetworkManager {
           return;
         }
 
-        // Check if same name exists (reconnect from same browser with new peerId)
-        const sameName = this.players.find(p => p.name === msg.name);
-        if (sameName) {
-          sameName.peerId = msg.peerId;
-          sameName.connected = true;
+        // Check if same name exists — ONLY treat as reconnect if that player
+        // is currently DISCONNECTED. A same-name join while the original is
+        // still connected is a different person, so give them a unique name.
+        const sameNameDisconnected = this.players.find(p => p.name === msg.name && p.connected === false);
+        if (sameNameDisconnected) {
+          sameNameDisconnected.peerId = msg.peerId;
+          sameNameDisconnected.connected = true;
           this.connections.set(msg.peerId, conn);
           if (this._lastPong) this._lastPong.set(msg.peerId, Date.now());
           this._send(conn, {
             type: 'welcome',
-            seat: sameName.seat,
+            seat: sameNameDisconnected.seat,
             players: this.players,
             roomCode: this.roomCode,
             gameActive: this.gameStarted,
           });
           this._broadcastRoster();
           if (this.gameStarted && this.onSyncRequest) {
-            this.onSyncRequest(sameName.seat);
+            this.onSyncRequest(sameNameDisconnected.seat);
           }
           return;
+        }
+
+        // If a connected player already has this exact name, make the newcomer's name unique
+        let joinName = msg.name;
+        if (this.players.some(p => p.name === joinName && p.connected)) {
+          let suffix = 2;
+          while (this.players.some(p => p.name === `${msg.name} (${suffix})`)) {
+            suffix++;
+          }
+          joinName = `${msg.name} (${suffix})`;
         }
 
         // New player — reject if game already started or room full
@@ -386,7 +398,7 @@ export class NetworkManager {
         const seat = this.players.length;
         const player = {
           seat,
-          name: msg.name,
+          name: joinName,
           peerId: msg.peerId,
           connected: true,
         };
