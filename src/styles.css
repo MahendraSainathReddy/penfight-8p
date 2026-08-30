@@ -1031,7 +1031,8 @@ html, body {
   box-shadow: var(--panel-highlight);
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
-  animation: turn-pop 0.3s var(--ease-spring) both;
+  /* No entrance animation here: updateTimers rebuilds this element every frame,
+     which would restart a fade-in each frame and leave it stuck at opacity 0. */
 }
 
 .timer-row.urgent {
