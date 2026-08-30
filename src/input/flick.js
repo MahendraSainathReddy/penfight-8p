@@ -30,24 +30,47 @@ export class FlickInput {
 
   _bindEvents() {
     const el = this.renderer.domElement;
-    el.addEventListener('mousedown', (e) => this._onStart(e.clientX, e.clientY));
-    el.addEventListener('mousemove', (e) => this._onMove(e.clientX, e.clientY));
-    el.addEventListener('mouseup', (e) => this._onEnd(e.clientX, e.clientY));
-    el.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      const t = e.touches[0];
-      this._onStart(t.clientX, t.clientY);
-    }, { passive: false });
-    el.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      const t = e.touches[0];
-      this._onMove(t.clientX, t.clientY);
-    }, { passive: false });
-    el.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      const t = e.changedTouches[0];
-      this._onEnd(t.clientX, t.clientY);
-    }, { passive: false });
+    // Store bound handlers so they can be removed in destroy().
+    this._handlers = {
+      mousedown: (e) => this._onStart(e.clientX, e.clientY),
+      mousemove: (e) => this._onMove(e.clientX, e.clientY),
+      mouseup: (e) => this._onEnd(e.clientX, e.clientY),
+      touchstart: (e) => {
+        e.preventDefault();
+        const t = e.touches[0];
+        this._onStart(t.clientX, t.clientY);
+      },
+      touchmove: (e) => {
+        e.preventDefault();
+        const t = e.touches[0];
+        this._onMove(t.clientX, t.clientY);
+      },
+      touchend: (e) => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        this._onEnd(t.clientX, t.clientY);
+      },
+    };
+    el.addEventListener('mousedown', this._handlers.mousedown);
+    el.addEventListener('mousemove', this._handlers.mousemove);
+    el.addEventListener('mouseup', this._handlers.mouseup);
+    el.addEventListener('touchstart', this._handlers.touchstart, { passive: false });
+    el.addEventListener('touchmove', this._handlers.touchmove, { passive: false });
+    el.addEventListener('touchend', this._handlers.touchend, { passive: false });
+  }
+
+  destroy() {
+    const el = this.renderer && this.renderer.domElement;
+    if (el && this._handlers) {
+      el.removeEventListener('mousedown', this._handlers.mousedown);
+      el.removeEventListener('mousemove', this._handlers.mousemove);
+      el.removeEventListener('mouseup', this._handlers.mouseup);
+      el.removeEventListener('touchstart', this._handlers.touchstart);
+      el.removeEventListener('touchmove', this._handlers.touchmove);
+      el.removeEventListener('touchend', this._handlers.touchend);
+    }
+    this._handlers = null;
+    this.penBodies = [];
   }
 
   _screenToNDC(x, y) {

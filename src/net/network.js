@@ -274,6 +274,11 @@ export class NetworkManager {
     });
 
     conn.on('close', () => {
+      // Ignore closes from a stale connection we've already replaced. Only the
+      // connection that is currently our hostConnection should trigger recovery.
+      if (this.hostConnection && conn !== this.hostConnection) {
+        return;
+      }
       // Connection closed — try to reconnect before declaring host lost.
       // The host may just be briefly backgrounded/asleep (common on mobile),
       // so retry several times over a longer window before giving up.
@@ -296,7 +301,16 @@ export class NetworkManager {
 
     if (this._hostLostFired) return; // already gave up
 
+    // Single-flight guard: only one reconnect chain may run at a time. Without
+    // this, overlapping/late close events could spawn parallel chains that each
+    // dial the host and race to overwrite hostConnection.
+    if (attempt === 0) {
+      if (this._reconnecting) return;
+      this._reconnecting = true;
+    }
+
     if (attempt >= MAX_ATTEMPTS || !this.peer || this.peer.destroyed || !this.roomCode) {
+      this._reconnecting = false;
       this._declareHostLost();
       return;
     }
@@ -323,6 +337,9 @@ export class NetworkManager {
       settled = true;
       clearTimeout(openTimeout);
       this.hostConnection = newConn;
+      this._reconnecting = false;
+      // Re-arm host-lost detection so a genuine later disconnect can still fire.
+      this._hostLostFired = false;
       this._setupGuestListeners(newConn);
       this._send(newConn, { type: 'join', name: this.myName, peerId: this.myPeerId, spectator: this.isSpectator || false });
       console.warn(`Reconnected to host on attempt ${attempt + 1}`);
@@ -594,6 +611,7 @@ export class NetworkManager {
   }
 
   _declareHostLost() {
+    this._reconnecting = false;
     if (this._hostLostFired) return; // Only fire once
     this._hostLostFired = true;
     console.warn('Host is gone — declaring host lost');

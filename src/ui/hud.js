@@ -80,10 +80,11 @@ export class HUD {
       panel.classList.add('hidden');
     });
 
-    // Close panel when clicking elsewhere
-    document.addEventListener('click', () => {
+    // Close panel when clicking elsewhere. Stored so destroy() can remove it.
+    this._closeTauntHandler = () => {
       panel.classList.add('hidden');
-    });
+    };
+    document.addEventListener('click', this._closeTauntHandler);
   }
 
   updateTimers(turnSeconds, shrinkSeconds) {
@@ -322,6 +323,14 @@ export class HUD {
   }
 
   destroy() {
+    if (this._closeTauntHandler) {
+      document.removeEventListener('click', this._closeTauntHandler);
+      this._closeTauntHandler = null;
+    }
+    if (this.notifyTimer) {
+      clearTimeout(this.notifyTimer);
+      this.notifyTimer = null;
+    }
     this.container.innerHTML = '';
   }
 }

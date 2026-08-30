@@ -5,7 +5,7 @@ import { GameState } from './game/state.js';
 import { NetworkManager } from './net/network.js';
 import { LobbyUI } from './ui/lobby.js';
 import { HUD } from './ui/hud.js';
-import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, TURN, DESK, SHRINK, getDeskScale, getPenStartPosition } from './config.js';
+import { PLAYER_COLORS, MAX_PLAYERS, SIM, SETTLE, INPUT, TURN, DESK, SHRINK, PEN, getDeskScale, getPenStartPosition } from './config.js';
 import { unlockAudio, playFlick, playCollision, playPenOut, playRoundWin, playMatchWin, playTurnNotify } from './audio/sfx.js';
 
 class PenFightGame {
@@ -37,7 +37,7 @@ class PenFightGame {
     this.players = [];
     this.playing = false;
     this.turnStartTime = 0;
-    this.turnWarned = false;
+    this._turnWarned = false;
   }
 
   async init() {
@@ -204,7 +204,7 @@ class PenFightGame {
     };
 
     this.network.onPlayerLeft = (seat) => {
-      if (this.playing && !this.isSpectator) {
+      if (this.playing && !this.isSpectator && this.hud && this._isValidSeat(seat)) {
         const player = this.players.find(p => p.seat === seat);
         const name = player ? player.name : 'A player';
         this.hud.notify(`${name} left the game`);
@@ -443,7 +443,7 @@ class PenFightGame {
     this.accumulator = 0;
     this.settleFrames = 0;
     this.turnStartTime = performance.now();
-    this.turnWarned = false;
+    this._turnWarned = false;
     this._gameLoop(performance.now());
 
     // Show landscape warning on mobile portrait
@@ -581,33 +581,77 @@ class PenFightGame {
     this._updateHUD();
   }
 
+  // Validate a seat index coming off the network before using it to index
+  // arrays or mutate state. Rejects out-of-range, non-integer, and NaN values.
+  _isValidSeat(seat) {
+    return Number.isInteger(seat) &&
+      seat >= 0 &&
+      this.gameState &&
+      seat < this.gameState.totalPlayers;
+  }
+
   _applyShot(msg) {
     if (!this.gameState) return;
-    playFlick(msg.power);
-    this.gameState.beginShot(msg.seat);
+    // Reject malformed or out-of-range shots from peers.
+    if (!this._isValidSeat(msg.seat)) return;
+    // beginShot enforces that it's actually this seat's turn and phase===aiming,
+    // so a peer can't shoot for someone else or out of turn.
+    if (!this.gameState.beginShot(msg.seat)) return;
+    playFlick(this._clampPower(msg.power));
     this._applyImpulse(msg);
     this.settleFrames = 0;
     this._updateHUD();
   }
 
+  _clampPower(power) {
+    const p = Number(power);
+    if (!Number.isFinite(p)) return 0;
+    return Math.max(0, Math.min(p, 1));
+  }
+
   _applyImpulse(data) {
+    if (!this._isValidSeat(data.seat)) return;
     const body = this.penBodies[data.seat];
     if (!body) return;
 
-    const force = data.power * INPUT.maxForce;
-    const impulse = {
-      x: data.direction.x * force,
-      y: 0,
-      z: data.direction.z * force,
-    };
+    // Clamp power to [0,1] and sanitize the direction vector so a crafted or
+    // buggy message can't launch pens with absurd force or NaN velocity.
+    const power = this._clampPower(data.power);
+    const dir = data.direction || {};
+    let dx = Number(dir.x);
+    let dz = Number(dir.z);
+    if (!Number.isFinite(dx) || !Number.isFinite(dz)) return;
+    // Normalize direction so magnitude can't be smuggled in via a huge vector.
+    const dlen = Math.sqrt(dx * dx + dz * dz) || 1;
+    dx /= dlen;
+    dz /= dlen;
 
-    // Apply impulse at the strike point (where the player clicked on the pen)
-    // Off-center strikes create torque = spin!
-    if (data.strikePoint) {
-      body.applyImpulseAtPoint(impulse, data.strikePoint, true);
+    const force = power * INPUT.maxForce;
+    const impulse = { x: dx * force, y: 0, z: dz * force };
+
+    // Only honor a strike point that is finite and near the pen (off-center
+    // strikes create spin, but a wild point would produce arbitrary torque).
+    const sp = this._sanitizeStrikePoint(data.strikePoint, body);
+    if (sp) {
+      body.applyImpulseAtPoint(impulse, sp, true);
     } else {
       body.applyImpulse(impulse, true);
     }
+  }
+
+  // Returns a safe strike point near the pen, or null to fall back to a
+  // center impulse. Rejects non-finite coords and clamps the offset distance.
+  _sanitizeStrikePoint(strikePoint, body) {
+    if (!strikePoint) return null;
+    const x = Number(strikePoint.x);
+    const z = Number(strikePoint.z);
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+    const pos = body.translation();
+    // Clamp the strike offset to roughly the pen length so torque stays sane.
+    const maxOffset = PEN.halfLength * 1.5;
+    const dx = Math.max(-maxOffset, Math.min(x - pos.x, maxOffset));
+    const dz = Math.max(-maxOffset, Math.min(z - pos.z, maxOffset));
+    return { x: pos.x + dx, y: pos.y, z: pos.z + dz };
   }
 
   _checkSettle() {
@@ -663,7 +707,7 @@ class PenFightGame {
     const result = this.gameState.settle(newOuts);
 
     // Notify outs
-    if (newOuts.length > 0) {
+    if (newOuts.length > 0 && this.hud) {
       const names = newOuts.map(s => {
         const p = this.players.find(pl => pl.seat === s);
         return s === this.mySeat ? 'You' : (p ? p.name : 'someone');
@@ -672,7 +716,7 @@ class PenFightGame {
     }
 
     // Handle result
-    if (result.kind === 'match_won') {
+    if (result.kind === 'match_won' && this.hud) {
       playMatchWin();
       const winner = this.players.find(p => p.seat === result.winner);
       this.hud.showMatchEnd(
@@ -688,7 +732,7 @@ class PenFightGame {
       const text = result.kind === 'round_tied'
         ? `Round ${this.gameState.round} draw · ${this.gameState.scores.join('-')}`
         : `${this._seatName(result.winner)} wins round ${this.gameState.round}!`;
-      this.hud.showRoundResult(text);
+      if (this.hud) this.hud.showRoundResult(text);
 
       // Only the host auto-advances to next round after delay
       // Guests wait for the host's next_round message
@@ -711,12 +755,27 @@ class PenFightGame {
     }
 
     this.turnStartTime = performance.now();
-    this.turnWarned = false;
+    this._turnWarned = false;
     this._updateHUD();
+  }
+
+  // Guard against applying a stale/out-of-order state update that would clobber
+  // newer state we already have. Returns true if the incoming state is stale.
+  _isStaleState(incoming) {
+    if (!this.gameState || !incoming) return false;
+    const incRev = incoming.revision;
+    if (typeof incRev !== 'number') return false; // no revision info — apply it
+    // Allow a lower revision if it's clearly a fresh match/round reset (the host
+    // rebuilds GameState on rematch, resetting revision to a small number).
+    if (incoming.round < this.gameState.round) return false; // new-match-ish; allow
+    if (incoming.phase === 'match_end') return false;        // always honor match end
+    // Otherwise, reject strictly-older revisions within the same round.
+    return incRev < this.gameState.revision && incoming.round === this.gameState.round;
   }
 
   _applySettle(msg) {
     if (!this.gameState) return;
+    if (this._isStaleState(msg.state)) return;
     this.gameState.restore(msg.state);
     if (msg.pens) {
       this._setAllPenStates(msg.pens);
@@ -725,7 +784,7 @@ class PenFightGame {
     if (msg.state.phase === 'match_end') {
       playMatchWin();
       const winner = this.players.find(p => p.seat === msg.state.winner);
-      this.hud.showMatchEnd(
+      if (this.hud) this.hud.showMatchEnd(
         winner ? winner.name : 'someone',
         this.gameState.scores,
         this.players,
@@ -736,7 +795,7 @@ class PenFightGame {
     } else if (msg.newOuts && msg.newOuts.length > 0) {
       playPenOut();
       const names = msg.newOuts.map(s => this._seatName(s));
-      this.hud.notify(`${names.join(' & ')} knocked out!`);
+      if (this.hud) this.hud.notify(`${names.join(' & ')} knocked out!`);
 
       // Play round win if the state indicates round ended
       if (msg.state.phase === 'round_result') {
@@ -745,12 +804,13 @@ class PenFightGame {
     }
 
     this.turnStartTime = performance.now();
-    this.turnWarned = false;
+    this._turnWarned = false;
     this._updateHUD();
   }
 
   _applySync(msg) {
     if (!this.gameState) return;
+    if (this._isStaleState(msg.state)) return;
     this.gameState.restore(msg.state);
 
     // Update players list if provided in sync
@@ -772,7 +832,7 @@ class PenFightGame {
     }
 
     // If we synced into match_end state, show the end screen
-    if (msg.state.phase === 'match_end' && msg.state.winner !== null) {
+    if (msg.state.phase === 'match_end' && msg.state.winner !== null && this.hud) {
       const winner = this.players.find(p => p.seat === msg.state.winner);
       this.hud.showMatchEnd(
         winner ? winner.name : 'someone',
@@ -832,7 +892,7 @@ class PenFightGame {
     this._resetShrink();
     this.hud.hideResult();
     this.turnStartTime = performance.now();
-    this.turnWarned = false;
+    this._turnWarned = false;
     this.hud.notify(`Round ${this.gameState.round} · ${this._seatName(this.gameState.opener)} opens`);
     this._updateHUD();
   }
@@ -846,7 +906,7 @@ class PenFightGame {
     this._resetShrink();
     this.hud.hideResult();
     this.turnStartTime = performance.now();
-    this.turnWarned = false;
+    this._turnWarned = false;
     this.hud.notify(`Round ${this.gameState.round} · ${this._seatName(this.gameState.opener)} opens`);
     this._updateHUD();
   }
@@ -922,8 +982,18 @@ class PenFightGame {
     }
   }
 
+  _stopGameLoop() {
+    if (this.animFrame) {
+      cancelAnimationFrame(this.animFrame);
+      this.animFrame = null;
+    }
+  }
+
   _onLeave() {
     localStorage.removeItem('pf8_active_room');
+    this._stopGameLoop();
+    if (this.flickInput && this.flickInput.destroy) this.flickInput.destroy();
+    if (this.hud && this.hud.destroy) this.hud.destroy();
     this.network.destroy();
     window.location.href = window.location.pathname;
   }
@@ -934,7 +1004,7 @@ class PenFightGame {
     this.gameState.restore(stateData);
     this.settleFrames = 0;
     this.turnStartTime = performance.now();
-    this.turnWarned = false;
+    this._turnWarned = false;
     this.rematchVotes = null; // Reset votes
 
     // Re-apply desk scale in case player count changed
@@ -976,11 +1046,15 @@ class PenFightGame {
   }
 
   _handleReaction(msg) {
+    if (!this.hud) return;
     if (msg.seat === this.mySeat) return; // Already shown locally
+    // Reject malformed content; cap length to avoid UI abuse (HUD also escapes).
+    if (typeof msg.emoji !== 'string' || msg.emoji.length === 0) return;
+    const content = msg.emoji.slice(0, 80);
     const player = this.players.find(p => p.seat === msg.seat);
     const name = player ? player.name : 'someone';
-    const color = PLAYER_COLORS[msg.seat] || { hex: '#ffffff' };
-    this.hud.showReaction(name, msg.emoji, color.hex, msg.isTaunt || false);
+    const color = (this._isValidSeat(msg.seat) && PLAYER_COLORS[msg.seat]) || { hex: '#ffffff' };
+    this.hud.showReaction(name, content, color.hex, msg.isTaunt || false);
   }
 
   _checkTurnTimeout() {
@@ -1058,6 +1132,13 @@ class PenFightGame {
       // Notify players (only on normal single-step advances, not catch-up jumps)
       if (!wasMultipleStepsBehind) {
         this.hud.notify(`Table shrinking! (${Math.round((1 - shrinkFactor) * 100)}% smaller)`, 3000);
+      }
+
+      // Host re-anchors all guests to this step immediately so shrink stays
+      // host-authoritative even between the normal (settle/turn) sync points.
+      // Guests apply msg.shrink in _applyShrinkState; they never eliminate.
+      if (this.network.isHost) {
+        this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
       }
 
       // Host checks if any pens are now outside the new boundary — eliminate immediately
@@ -1150,6 +1231,20 @@ class PenFightGame {
     if (!this.isSpectator && this.gameState.phase === 'aiming' && this.turnStartTime) {
       const elapsed = performance.now() - this.turnStartTime;
       turnSeconds = Math.max(0, Math.ceil((TURN.timeoutMs - elapsed) / 1000));
+
+      // Warn the active player once when their turn is about to time out.
+      const isMyTurn = this.gameState.activeSeat === this.mySeat;
+      if (isMyTurn && turnSeconds <= 5 && turnSeconds > 0) {
+        if (!this._turnWarned) {
+          this._turnWarned = true;
+          playTurnNotify();
+          this.hud.notify('Hurry — your turn is ending!', 1500);
+        }
+      } else if (!isMyTurn || turnSeconds > 5) {
+        this._turnWarned = false;
+      }
+    } else {
+      this._turnWarned = false;
     }
 
     // Shrink timer — time until next shrink (everyone sees this)
