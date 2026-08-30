@@ -189,7 +189,7 @@ class PenFightGame {
         // Create a temporary state — will be overwritten by sync
         const tempState = { totalPlayers, phase: 'aiming', scores: new Array(totalPlayers).fill(0), outs: [], activeSeat: 0, opener: 0, round: 1, turn: 0, roundWinners: [], winner: null, revision: 0 };
         this._startGame(tempState);
-        this.hud.notify('Reconnected! Syncing...', 2000);
+        this.hud.notify('Reconnected! You rejoin next round.', 3500);
       }
     };
 
