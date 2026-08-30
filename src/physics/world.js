@@ -106,8 +106,9 @@ export function setPenState(body, state) {
 
 export function isPenOnDesk(body) {
   const pos = body.translation();
-  const hw = (DESK.width * _deskScale) / 2 + PEN.halfLength * 0.2;
-  const hd = (DESK.depth * _deskScale) / 2 + PEN.halfLength * 0.2;
+  // Pen center must be within the desk (small negative margin so it's clearly on)
+  const hw = (DESK.width * _deskScale) / 2 - PEN.radius;
+  const hd = (DESK.depth * _deskScale) / 2 - PEN.radius;
   // Pen is "out" if its center is beyond the desk edges (+ small margin)
   if (Math.abs(pos.x) > hw) return false;
   if (Math.abs(pos.z) > hd) return false;

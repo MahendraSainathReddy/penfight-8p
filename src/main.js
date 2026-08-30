@@ -1051,6 +1051,7 @@ class PenFightGame {
           }
         }
         if (newOuts.length > 0) {
+          const activeWasEliminated = newOuts.includes(this.gameState.activeSeat);
           for (const seat of newOuts) {
             this.gameState.outs.add(seat);
             this.gameState.revision++;
@@ -1067,8 +1068,22 @@ class PenFightGame {
             return;
           }
 
-          // Sync eliminations to guests
+          // If the active player was eliminated, advance the turn to the next player
+          if (activeWasEliminated) {
+            const next = this.gameState.getNextSeat(this.gameState.activeSeat);
+            if (next !== null) {
+              this.gameState.activeSeat = next;
+              this.gameState.turn++;
+              this.gameState.revision++;
+              this.turnStartTime = performance.now();
+              this._turnWarned = false;
+              this._timeoutSkips = 0;
+            }
+          }
+
+          // Sync eliminations + turn to guests
           this.network.sendSync(this.gameState.serialize(), this._getAllPenStates());
+          this._updateHUD();
         }
       }
     }
@@ -1084,6 +1099,35 @@ class PenFightGame {
     if (this.deskMesh) {
       this.deskMesh.scale.set(1, 1, 1);
     }
+  }
+
+  _updateTimers() {
+    if (!this.hud || !this.gameState) return;
+
+    let turnSeconds = null;
+    let shrinkSeconds = null;
+
+    // Turn timer — only during aiming, and not for spectators
+    if (!this.isSpectator && this.gameState.phase === 'aiming' && this.turnStartTime) {
+      const elapsed = performance.now() - this.turnStartTime;
+      turnSeconds = Math.max(0, Math.ceil((TURN.timeoutMs - elapsed) / 1000));
+    }
+
+    // Shrink timer — time until next shrink (everyone sees this)
+    if (this._roundStartTime && this.gameState.phase !== 'match_end' && this.gameState.phase !== 'round_result') {
+      const elapsed = performance.now() - this._roundStartTime;
+      const shrinkStep = this._shrinkStep || 0;
+      const nextFactor = 1 - ((shrinkStep + 1) * SHRINK.stepPercent);
+      // Only show if not yet at minimum
+      if (nextFactor >= SHRINK.minScale || shrinkStep === 0) {
+        const nextShrinkAt = elapsed < SHRINK.startDelayMs
+          ? SHRINK.startDelayMs
+          : SHRINK.startDelayMs + shrinkStep * SHRINK.intervalMs;
+        shrinkSeconds = Math.max(0, Math.ceil((nextShrinkAt - elapsed) / 1000));
+      }
+    }
+
+    this.hud.updateTimers(turnSeconds, shrinkSeconds);
   }
 
   _updateHUD() {
@@ -1225,6 +1269,9 @@ class PenFightGame {
 
     // Shrink runs on ALL clients for visual consistency
     this._checkShrink();
+
+    // Update timers display
+    this._updateTimers();
 
     // Render
     this.renderer.render(this.scene, this.camera);

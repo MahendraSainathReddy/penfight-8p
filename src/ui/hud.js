@@ -12,6 +12,7 @@ export class HUD {
     this.onLeave = onLeave; // callback when user wants to leave
     this.container.innerHTML = `
       <div id="hud-scoreboard" class="hud-scoreboard"></div>
+      <div id="hud-timers" class="hud-timers"></div>
       <div id="hud-reactions" class="hud-reactions"></div>
       <div id="hud-turn" class="hud-turn"></div>
       <div id="hud-notify" class="hud-notify"></div>
@@ -21,6 +22,7 @@ export class HUD {
       <div id="hud-reaction-toast" class="hud-reaction-toast"></div>
     `;
     this.scoreboard = document.getElementById('hud-scoreboard');
+    this.timersEl = document.getElementById('hud-timers');
     this.turnEl = document.getElementById('hud-turn');
     this.notifyEl = document.getElementById('hud-notify');
     this.resultEl = document.getElementById('hud-result');
@@ -31,6 +33,19 @@ export class HUD {
     this._setupLandscapeButton();
     this._setupLeaveButton();
     this._setupReactions();
+  }
+
+  updateTimers(turnSeconds, shrinkSeconds) {
+    if (!this.timersEl) return;
+    let html = '';
+    if (turnSeconds !== null && turnSeconds !== undefined) {
+      const urgent = turnSeconds <= 5 ? ' urgent' : '';
+      html += `<div class="timer-row${urgent}">⏱ Turn: ${turnSeconds}s</div>`;
+    }
+    if (shrinkSeconds !== null && shrinkSeconds !== undefined) {
+      html += `<div class="timer-row shrink">▣ Shrink: ${shrinkSeconds}s</div>`;
+    }
+    this.timersEl.innerHTML = html;
   }
 
   _setupLeaveButton() {
