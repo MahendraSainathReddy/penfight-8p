@@ -767,15 +767,15 @@ html, body {
 /* === Taunt Button & Panel === */
 .hud-taunt-btn {
   position: absolute;
-  top: 268px;
-  right: 12px;
+  top: 138px;
+  left: 14px;
   pointer-events: auto;
 }
 
 .hud-taunt-panel {
   position: absolute;
-  top: 268px;
-  right: 56px;
+  top: 138px;
+  left: 56px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -821,11 +821,13 @@ html, body {
 
 @media (max-width: 480px) {
   .hud-taunt-btn {
-    top: 232px;
+    top: 110px;
+    left: 8px;
   }
   .hud-taunt-panel {
-    top: 232px;
-    right: 48px;
+    top: 110px;
+    left: 48px;
+    right: auto;
   }
   .taunt-item {
     font-size: 0.72rem;
