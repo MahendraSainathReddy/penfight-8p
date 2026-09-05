@@ -1261,7 +1261,6 @@ class PenFightGame {
     if (!this.hud || !this.gameState) return;
 
     let turnSeconds = null;
-    let shrinkSeconds = null;
 
     // Turn timer — only during aiming, and not for spectators.
     // Lazily seed turnStartTime if it was never set (mirrors _checkShrink's
@@ -1286,21 +1285,9 @@ class PenFightGame {
       this._turnWarned = false;
     }
 
-    // Shrink timer — time until next shrink (everyone sees this)
-    if (this._roundStartTime && this.gameState.phase !== 'match_end' && this.gameState.phase !== 'round_result') {
-      const elapsed = performance.now() - this._roundStartTime;
-      const shrinkStep = this._shrinkStep || 0;
-      const nextFactor = 1 - ((shrinkStep + 1) * SHRINK.stepPercent);
-      // Only show if not yet at minimum
-      if (nextFactor >= SHRINK.minScale || shrinkStep === 0) {
-        const nextShrinkAt = elapsed < SHRINK.startDelayMs
-          ? SHRINK.startDelayMs
-          : SHRINK.startDelayMs + shrinkStep * SHRINK.intervalMs;
-        shrinkSeconds = Math.max(0, Math.ceil((nextShrinkAt - elapsed) / 1000));
-      }
-    }
-
-    this.hud.updateTimers(turnSeconds, shrinkSeconds);
+    // Shrink countdown display removed by request — the table still shrinks,
+    // players just no longer see a "Shrink: Ns" pill.
+    this.hud.updateTimers(turnSeconds);
   }
 
   _updateHUD() {

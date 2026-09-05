@@ -68,8 +68,60 @@ export class NetworkManager {
     return code;
   }
 
+  // Stable per-browser identity that survives rejoins. PeerJS assigns a fresh
+  // random peerId each session, so we can't use it to recognize a returning
+  // player. This clientId (persisted in localStorage) lets the host match a
+  // rejoining player to their existing seat instead of seating them as a
+  // duplicate ("user (2)").
+  _getClientId() {
+    if (this._clientId) return this._clientId;
+    let id = null;
+    try {
+      id = localStorage.getItem('pf8_client_id');
+      if (!id) {
+        id = 'c-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem('pf8_client_id', id);
+      }
+    } catch (e) {
+      // localStorage unavailable (private mode) — fall back to a session id.
+      id = 'c-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+    this._clientId = id;
+    return id;
+  }
+
   _getHostPeerId(code) {
     return ROOM_PREFIX + code;
+  }
+
+  // Single source of truth for the PeerJS/WebRTC config so host, guest, and
+  // spectator all use the same ICE servers. Cross-network play (e.g. mobile
+  // data <-> WiFi) usually can't connect peer-to-peer directly because both
+  // sides sit behind NAT; it needs a TURN relay. We list multiple TURN
+  // providers and transports (UDP 80, TCP 443, TLS 443) so a relay is found
+  // even when carrier firewalls block UDP.
+  _peerConfig() {
+    return {
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          // Metered.ca free TURN
+          { urls: 'turn:standard.relay.metered.ca:80', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+          { urls: 'turn:standard.relay.metered.ca:80?transport=tcp', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+          { urls: 'turn:standard.relay.metered.ca:443', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+          { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
+          // OpenRelay free TURN (fallback provider for redundancy)
+          { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        ],
+        iceTransportPolicy: 'all',
+      },
+    };
   }
 
   async createRoom(playerName) {
@@ -80,21 +132,7 @@ export class NetworkManager {
     return new Promise((resolve, reject) => {
       const peerId = this._getHostPeerId(this.roomCode);
 
-      this.peer = new Peer(peerId, {
-        debug: 1,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'turn:standard.relay.metered.ca:80', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
-            { urls: 'turn:standard.relay.metered.ca:443', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
-            { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
-          ],
-          iceTransportPolicy: 'all',
-        }
-      });
+      this.peer = new Peer(peerId, this._peerConfig());
 
       const timeout = setTimeout(() => {
         reject(new Error('Connection timed out. Try again.'));
@@ -109,6 +147,7 @@ export class NetworkManager {
           seat: 0,
           name: playerName,
           peerId: id,
+          clientId: this._getClientId(),
           connected: true,
         }];
         this._setupHostListeners();
@@ -149,20 +188,7 @@ export class NetworkManager {
   async _attemptJoin(attempt) {
     return new Promise((resolve, reject) => {
       // Create our peer with a random ID
-      this.peer = new Peer(undefined, {
-        debug: 1,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'turn:standard.relay.metered.ca:80', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
-            { urls: 'turn:standard.relay.metered.ca:443', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
-            { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
-          ],
-          iceTransportPolicy: 'all',
-        }
-      });
+      this.peer = new Peer(undefined, this._peerConfig());
 
       const timeout = setTimeout(() => {
         if (this.mySeat === -1) {
@@ -187,7 +213,7 @@ export class NetworkManager {
 
         conn.on('open', () => {
           this.hostConnection = conn;
-          this._send(conn, { type: 'join', name: this.myName, peerId: id });
+          this._send(conn, { type: 'join', name: this.myName, peerId: id, clientId: this._getClientId() });
           this._setupGuestListeners(conn);
         });
 
@@ -341,7 +367,7 @@ export class NetworkManager {
       // Re-arm host-lost detection so a genuine later disconnect can still fire.
       this._hostLostFired = false;
       this._setupGuestListeners(newConn);
-      this._send(newConn, { type: 'join', name: this.myName, peerId: this.myPeerId, spectator: this.isSpectator || false });
+      this._send(newConn, { type: 'join', name: this.myName, peerId: this.myPeerId, spectator: this.isSpectator || false, clientId: this._getClientId() });
       console.warn(`Reconnected to host on attempt ${attempt + 1}`);
     });
 
@@ -356,10 +382,28 @@ export class NetworkManager {
   _handleHostMessage(conn, msg) {
     switch (msg.type) {
       case 'join': {
-        // Check if already in (reconnect or duplicate) — MUST be checked before gameStarted
-        // so disconnected players can rejoin active games
-        const existing = this.players.find(p => p.peerId === msg.peerId);
+        // Recognize a returning player by their stable clientId FIRST. PeerJS
+        // hands out a new random peerId each session, so matching on peerId
+        // alone misses rejoins and seats them as a duplicate ("user (2)").
+        // Matching on clientId reuses their seat regardless of peerId churn or
+        // whether their previous connection has been marked disconnected yet.
+        const byClient = msg.clientId
+          ? this.players.find(p => p.clientId === msg.clientId)
+          : null;
+        const existing = byClient || this.players.find(p => p.peerId === msg.peerId);
         if (existing) {
+          // Close the stale connection (if any) so we don't leak a dead one.
+          const oldPeerId = existing.peerId;
+          if (oldPeerId && oldPeerId !== msg.peerId) {
+            const oldConn = this.connections.get(oldPeerId);
+            if (oldConn && oldConn !== conn) {
+              try { oldConn.close(); } catch (e) { /* ignore */ }
+            }
+            this.connections.delete(oldPeerId);
+            if (this._lastPong) this._lastPong.delete(oldPeerId);
+          }
+          existing.peerId = msg.peerId;
+          if (msg.clientId) existing.clientId = msg.clientId;
           existing.connected = true;
           this.connections.set(msg.peerId, conn);
           if (this._lastPong) this._lastPong.set(msg.peerId, Date.now());
@@ -384,6 +428,7 @@ export class NetworkManager {
         const sameNameDisconnected = this.players.find(p => p.name === msg.name && p.connected === false);
         if (sameNameDisconnected) {
           sameNameDisconnected.peerId = msg.peerId;
+          if (msg.clientId) sameNameDisconnected.clientId = msg.clientId;
           sameNameDisconnected.connected = true;
           this.connections.set(msg.peerId, conn);
           if (this._lastPong) this._lastPong.set(msg.peerId, Date.now());
@@ -453,6 +498,7 @@ export class NetworkManager {
           seat,
           name: joinName,
           peerId: msg.peerId,
+          clientId: msg.clientId || null,
           connected: true,
         };
         this.players.push(player);
@@ -727,19 +773,7 @@ export class NetworkManager {
     this.isSpectator = true;
 
     return new Promise((resolve, reject) => {
-      this.peer = new Peer(undefined, {
-        debug: 1,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'turn:standard.relay.metered.ca:80', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
-            { urls: 'turn:standard.relay.metered.ca:443', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
-            { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'b093b726a47bce856174b9a2', credential: '2CIFbqZXvEMRqDpw' },
-          ],
-          iceTransportPolicy: 'all',
-        }
-      });
+      this.peer = new Peer(undefined, this._peerConfig());
 
       const timeout = setTimeout(() => {
         this.peer.destroy();
@@ -753,7 +787,7 @@ export class NetworkManager {
 
         conn.on('open', () => {
           this.hostConnection = conn;
-          this._send(conn, { type: 'join', name, peerId: id, spectator: true });
+          this._send(conn, { type: 'join', name, peerId: id, spectator: true, clientId: this._getClientId() });
           this._setupGuestListeners(conn);
         });
 

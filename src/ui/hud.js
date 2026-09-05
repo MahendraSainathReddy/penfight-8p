@@ -87,15 +87,12 @@ export class HUD {
     document.addEventListener('click', this._closeTauntHandler);
   }
 
-  updateTimers(turnSeconds, shrinkSeconds) {
+  updateTimers(turnSeconds) {
     if (!this.timersEl) return;
     let html = '';
     if (turnSeconds !== null && turnSeconds !== undefined) {
       const urgent = turnSeconds <= 5 ? ' urgent' : '';
       html += `<div class="timer-row${urgent}">⏱ Turn: ${turnSeconds}s</div>`;
-    }
-    if (shrinkSeconds !== null && shrinkSeconds !== undefined) {
-      html += `<div class="timer-row shrink">▣ Shrink: ${shrinkSeconds}s</div>`;
     }
     this.timersEl.innerHTML = html;
   }
